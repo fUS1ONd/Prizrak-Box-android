@@ -1,8 +1,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="PluralsCandidate">
-    <string name="launch_name_meta">Clash Meta</string>
-    <string name="launch_name_alpha">Clash Meta Alpha</string>
-    <string name="application_name_meta">Clash Meta for Android</string>
-    <string name="application_name_alpha">Clash Meta for Android Alpha</string>
+    <string name="launch_name_meta">Prizrak-Box</string>
+    <string name="launch_name_alpha">Prizrak-Box Alpha</string>
+    <string name="application_name_meta">Prizrak-Box</string>
+    <string name="application_name_alpha">Prizrak-Box Alpha</string>
 
     <string name="stopped">Stopped</string>
     <string name="tap_to_start">Tap to start</string>
@@ -45,6 +45,7 @@
     <string name="import_from_url">Import from URL</string>
     <string name="import_from_qr">Import from QR Code</string>
     <string name="external">External</string>
+    <string name="converted">Converted</string>
     <string name="format_type_unsaved">%s (Unsaved)</string>
 
     <string name="application_broken">Application Broken</string>
@@ -81,6 +82,8 @@
     <string name="unavailable">Unavailable</string>
     <string name="empty_name">Empty Name</string>
     <string name="invalid_url">Invalid URL</string>
+    <string name="import_loading_activating">Loading and activating profile</string>
+    <string name="import_profile_failed">Profile import failed. Please check the configuration.</string>
     <string name="loading">Loading</string>
 
     <string name="format_fetching_configuration">Fetching configuration from \'%s\'</string>
@@ -98,7 +101,7 @@
     <string name="cancel">Cancel</string>
     <string name="reset">Reset</string>
 
-    <string name="clash_logcat">Clash Logcat</string>
+    <string name="clash_logcat">Prizrak-Box Logcat</string>
     <string name="history">History</string>
     <string name="logcat">Logcat</string>
 
@@ -112,7 +115,7 @@
     <string name="override">Override</string>
 
     <string name="auto_restart">Auto Restart</string>
-    <string name="allow_clash_auto_restart">Allow clash auto restart</string>
+    <string name="allow_clash_auto_restart">Allow Prizrak-Box auto restart</string>
 
     <string name="route_system_traffic">Route System Traffic</string>
     <string name="routing_via_vpn_service">Auto routing all system traffic via VpnService</string>
@@ -134,7 +137,7 @@
     <string name="access_control_packages">Access Control Packages</string>
     <string name="access_control_packages_summary">Configure access permission for apps</string>
 
-    <string name="options_unavailable">Options Unavailable until Clash Stopped</string>
+    <string name="options_unavailable">Options Unavailable until Prizrak-Box Stopped</string>
 
     <string name="general">General</string>
     <string name="dns">DNS</string>
@@ -211,22 +214,32 @@
     <string name="import_from_clipboard">Import from Clipboard</string>
     <string name="export_to_clipboard">Export to Clipboard</string>
 
-    <string name="clash_meta_for_android">Clash Meta for Android</string>
+    <string name="clash_meta_for_android">Prizrak-Box</string>
 
     <string name="document">Document</string>
     <string name="feedback">Feedback</string>
     <string name="sources">Sources</string>
     <string name="donate">Donate</string>
-    <string name="clash_wiki">Clash Wiki</string>
+    <string name="clash_wiki">Prizrak-Box Wiki</string>
     <string name="github_issues">Github Issues</string>
     <string name="google_play">Google Play</string>
-    <string name="clash_meta_core">Clash Meta Core</string>
+    <string name="clash_meta_core">Mihomo Core</string>
     <string name="clash_wiki_url" translatable="false">https://github.com/Dreamacro/clash/wiki</string>
-    <string name="meta_github_url" translatable="false">https://github.com/MetaCubeX/ClashMetaForAndroid</string>
-    <string name="clash_meta_core_url" translatable="false">https://github.com/MetaCubeX/Clash.Meta</string>
+    <string name="meta_github_url" translatable="false">https://github.com/legiz-ru/Prizrak-Box</string>
+    <string name="clash_meta_core_url" translatable="false">https://github.com/MetaCubeX/mihomo</string>
+    <string name="moshen_core">Moshen Core</string>
+    <string name="moshen_core_url" translatable="false">https://github.com/snakem982/mihomo/tree/moshen/</string>
+    <string name="mihomo_smart_core">Mihomo Smart Core</string>
+    <string name="mihomo_smart_core_url" translatable="false">https://github.com/vernesong/mihomo/releases</string>
+    <string name="mihomo_xhttp_core">Ядро mihomo + xhttp</string>
+    <string name="mihomo_xhttp_core_url" translatable="false">https://github.com/daiaji/mihomo/tree/feat/splithttp</string>
+    <string name="moshen_fork_core">Ядро moshen fork</string>
+    <string name="moshen_fork_core_url" translatable="false">https://github.com/legiz-ru/moshen/releases</string>
+    <string name="cmfa_origin">CMFA</string>
+    <string name="cmfa_origin_url" translatable="false">https://github.com/MetaCubeX/ClashMetaForAndroid</string>
 
-    <string name="tips_properties"><![CDATA[Accept Only <strong>Clash Config</strong>(including <strong>Proxy</strong>/<strong>Rules</strong>)]]></string>
-    <string name="tips_help"><![CDATA[Clash Meta for Android is a <strong>freeware</strong> and we do <strong>NOT</strong> provide any service for it]]></string>
+    <string name="tips_properties"><![CDATA[Accept Only <strong>Prizrak-Box Config</strong>(including <strong>Proxy</strong>/<strong>Rules</strong>)]]></string>
+    <string name="tips_help"><![CDATA[Prizrak-Box is a <strong>freeware</strong> and we do <strong>NOT</strong> provide any service for it]]></string>
 
     <string name="google_play_url" translatable="false">https://play.google.com/store/apps/details?id=com.github.kr328.clash</string>
 
@@ -241,6 +254,7 @@
     <string name="follow_system_android_10">Follow System (Android 10+)</string>
     <string name="always_dark">Always Dark</string>
     <string name="always_light">Always Light</string>
+    <string name="always_summer">Always Summer 🥒</string>
 
     <string name="tun_stack_mode">Stack Mode</string>
     <string name="tun_stack_system">System Stack</string>
@@ -296,8 +310,8 @@
 
     <string name="mode_switch_tips">Valid only for current session</string>
 
-    <string name="clash_meta_wiki">Clash Meta Wiki</string>
-    <string name="clash_meta_wiki_url" translatable="false">https://wiki.metacubex.one</string>
+    <string name="clash_meta_wiki">Mihomo Documentation</string>
+    <string name="clash_meta_wiki_url" translatable="false">https://wiki.metacubex.one/ru/</string>
 
     <string name="meta_features">Meta Features</string>
     <string name="unified_delay">Unified Delay</string>
@@ -341,13 +355,69 @@
     <string name="toast_profile_updated_complete">Update profile %s completed</string>
     <string name="toast_profile_updated_failed">Update profile %1$s failed: %2$s</string>
     <string name="external_control_activity">External Control</string>
-    <string name="external_control_started">Clash.Meta service started</string>
-    <string name="external_control_stopped">Clash.Meta service stopped</string>
+    <string name="external_control_started">Prizrak-Box service started</string>
+    <string name="external_control_stopped">Prizrak-Box service stopped</string>
 
     <string name="hide_app_icon_title">Hide App Icon</string>
     <string name="hide_app_icon_desc">You can dial *#*#252746382#*#* to open this App</string>
     <string name="hide_from_recents_title">Hide from Recents</string>
     <string name="hide_from_recents_desc">Hide app from the Recent apps screen</string>
+    <string name="empty_clipboard">Clipboard is empty</string>
     <string name="import_from_qr_no_permission">Camera access is restricted. Please enable it in Settings.</string>
     <string name="import_from_qr_exception">An unhandled system exception occurred.</string>
+
+    <!-- Material 3 Redesign Strings -->
+    <string name="welcome">Welcome!</string>
+    <string name="add_first_profile">Add your first profile to get started</string>
+    <string name="add_profile">Add Profile</string>
+    <string name="home">Home</string>
+    <string name="nav_settings">Settings</string>
+    <string name="traffic_used">Used</string>
+    <string name="traffic_available">Available</string>
+    <string name="expires">Expires</string>
+    <string name="updated">Updated</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="add_from_clipboard">Add from Clipboard</string>
+    <string name="scan_qr_code">Scan QR Code</string>
+    <string name="add_manually">Add Manually</string>
+    <string name="add_from_file">Add from File</string>
+    <string name="manage_profiles">Profiles</string>
+    <string name="new_profile_btn">New Profile</string>
+    <string name="update_subscriptions">Update Subscriptions</string>
+    <string name="format_traffic_compact">%1$s / %2$s</string>
+    <string name="proxy_groups">Proxy Groups</string>
+    <string name="format_delay_ms">%d ms</string>
+    <string name="no_delay">-</string>
+    <string name="timeout">Timeout</string>
+    <string name="selected_node">Selected: %s</string>
+
+    <string name="fetching_icons">Fetching icons</string>
+    <string name="privacy">Privacy</string>
+    <string name="send_hwid_title">Send HWID</string>
+    <string name="send_hwid_desc">Send device identifier with profile requests</string>
+    <string name="delay_display">Delay Display</string>
+    <string name="delay_display_dots">Colored dots</string>
+    <string name="delay_display_ms">Milliseconds</string>
+
+    <!-- TV Navigation -->
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+
+    <!-- Converted profile / template selection -->
+    <string name="select_template">Select Template</string>
+    <string name="select_template_desc">Choose a routing template for this profile</string>
+    <string name="template_default">🇷🇺 Default (Prizrak-Box)</string>
+    <string name="template_ru_bundle">🇷🇺 RU-Bundle by Legiz</string>
+    <string name="template_ultimate">🇷🇺 Ultimate by Davoyan</string>
+    <string name="template_default_smart">🇷🇺 Default + smart</string>
+    <string name="template_ru_bundle_smart">🇷🇺 RU-Bundle by Legiz + smart</string>
+    <string name="template_ultimate_smart">🇷🇺 Ultimate by Davoyan + smart</string>
+    <string name="template_china_smart">🇨🇳 by qichiyuhub + smart</string>
+    <string name="template_custom">Custom</string>
+    <string name="custom_template">Custom Template</string>
+    <string name="custom_template_desc">Load a custom YAML template file for converted profiles</string>
+    <string name="custom_template_not_set">Not set (falls back to Default)</string>
+    <string name="import_converted_profile">Import as Converted Profile</string>
+    <string name="converted_profile_hint">Proxy links (vless://, trojan://, etc.) or SingBox JSON — a template will be applied</string>
+    <string name="templates">Templates</string>
 </resources>

@@ -47,7 +47,7 @@ subprojects {
         defaultConfig {
             if (isApp) {
                 val customApplicationId = queryConfigProperty("custom.application.id") as? String?
-                applicationId = customApplicationId.takeIf { it?.isNotBlank() == true } ?: "com.github.metacubex.clash"
+                applicationId = customApplicationId.takeIf { it?.isNotBlank() == true } ?: "ru.legiz.prizrakbox"
             }
 
             project.name.let { name ->
@@ -58,8 +58,8 @@ subprojects {
             minSdk = 21
             targetSdk = 35
 
-            versionName = "2.11.23"
-            versionCode = 211023
+            versionName = "1.1"
+            versionCode = 101
 
             resValue("string", "release_name", "v$versionName")
             resValue("integer", "release_code", "$versionCode")
@@ -77,7 +77,7 @@ subprojects {
             if (!isApp) {
                 consumerProguardFiles("consumer-rules.pro")
             } else {
-                setProperty("archivesBaseName", "cmfa-$versionName")
+                setProperty("archivesBaseName", "prizrak-box-$versionName")
             }
         }
 

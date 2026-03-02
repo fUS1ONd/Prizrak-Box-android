@@ -27,9 +27,19 @@ data class Profile(
     val updatedAt: Long,
     val imported: Boolean,
     val pending: Boolean,
+    val supportUrl: String = "",
+    val profileWebPageUrl: String = "",
+    val profileTitle: String = "",
+    val profileLogo: String = "",
+    val profileUpdateInterval: Int = 0,
+    val announce: String = "",
 ) : Parcelable {
     enum class Type {
-        File, Url, External
+        File, Url, External,
+        /** Profile whose content was converted from proxy links (vless://, trojan://, etc.)
+         *  or SingBox JSON via [com.github.kr328.clash.core.Clash.convertAndApplyTemplate].
+         *  A Clash YAML template is applied during each import/update. */
+        Converted
     }
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {

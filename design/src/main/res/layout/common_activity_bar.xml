@@ -11,7 +11,7 @@
         android:layout_width="@dimen/item_header_component_size"
         android:layout_height="@dimen/item_header_component_size"
         android:layout_marginHorizontal="@dimen/item_header_margin"
-        android:background="?attr/selectableItemBackgroundBorderless"
+        android:background="@drawable/bg_toolbar_button_focus"
         android:clickable="true"
         android:contentDescription="@string/close"
         android:focusable="true"
@@ -24,5 +24,5 @@
         android:layout_height="wrap_content"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6" />
+        android:textAppearance="@style/TextAppearance.Material3.TitleLarge" />
 </LinearLayout>

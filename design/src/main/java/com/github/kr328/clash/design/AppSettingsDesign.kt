@@ -22,7 +22,8 @@ class AppSettingsDesign(
     onHideIconChange: (hide: Boolean) -> Unit,
 ) : Design<AppSettingsDesign.Request>(context) {
     enum class Request {
-        ReCreateAllActivities
+        ReCreateAllActivities,
+        SelectCustomTemplate,
     }
 
     private val binding = DesignSettingsCommonBinding
@@ -52,12 +53,21 @@ class AppSettingsDesign(
 
             selectableList(
                 value = uiStore::darkMode,
-                values = DarkMode.values(),
-                valuesText = arrayOf(
-                    R.string.follow_system_android_10,
-                    R.string.always_light,
-                    R.string.always_dark
-                ),
+                values = if (uiStore.summerModeUnlocked) DarkMode.values() else arrayOf(DarkMode.Auto, DarkMode.ForceLight, DarkMode.ForceDark),
+                valuesText = if (uiStore.summerModeUnlocked) {
+                    arrayOf(
+                        R.string.follow_system_android_10,
+                        R.string.always_light,
+                        R.string.always_dark,
+                        R.string.always_summer
+                    )
+                } else {
+                    arrayOf(
+                        R.string.follow_system_android_10,
+                        R.string.always_light,
+                        R.string.always_dark
+                    )
+                },
                 icon = R.drawable.ic_baseline_brightness_4,
                 title = R.string.dark_mode
             ) {
@@ -65,6 +75,13 @@ class AppSettingsDesign(
                     requests.trySend(Request.ReCreateAllActivities)
                 }
             }
+
+            switch(
+                value = uiStore::delayDisplayDots,
+                icon = R.drawable.ic_baseline_speed,
+                title = R.string.delay_display,
+                summary = R.string.delay_display_dots,
+            )
 
             switch(
                 value = uiStore::hideAppIcon,
@@ -97,6 +114,26 @@ class AppSettingsDesign(
                 summary = R.string.show_traffic_summary
             ) {
                 enabled = !running
+            }
+
+            category(R.string.privacy)
+
+            switch(
+                value = uiStore::sendHwid,
+                icon = R.drawable.ic_baseline_assignment,
+                title = R.string.send_hwid_title,
+                summary = R.string.send_hwid_desc,
+            )
+
+            category(R.string.templates)
+
+            clickable(
+                title = R.string.custom_template,
+                summary = R.string.custom_template_desc,
+            ) {
+                clicked {
+                    requests.trySend(Request.SelectCustomTemplate)
+                }
             }
         }
 

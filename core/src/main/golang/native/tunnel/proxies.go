@@ -1,14 +1,21 @@
 package tunnel
 
 import (
+	"crypto/md5"
+	"fmt"
+	"os"
+	P "path"
 	"sort"
 	"strings"
+
+	"cfa/native/config"
 
 	"github.com/dlclark/regexp2"
 
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/provider"
+	"github.com/metacubex/mihomo/component/profile/cachefile"
 	"github.com/metacubex/mihomo/log"
 	"github.com/metacubex/mihomo/tunnel"
 )
@@ -22,16 +29,19 @@ const (
 )
 
 type Proxy struct {
-	Name     string `json:"name"`
-	Title    string `json:"title"`
-	Subtitle string `json:"subtitle"`
-	Type     string `json:"type"`
-	Delay    int    `json:"delay"`
+	Name     string  `json:"name"`
+	Title    string  `json:"title"`
+	Subtitle string  `json:"subtitle"`
+	Type     string  `json:"type"`
+	Delay    int     `json:"delay"`
+	Weight   float64 `json:"weight"` // smart group weight; 0 if not applicable
 }
 
 type ProxyGroup struct {
 	Type    string   `json:"type"`
 	Now     string   `json:"now"`
+	Icon    string   `json:"icon"`
+	Hidden  bool     `json:"hidden"`
 	Proxies []*Proxy `json:"proxies"`
 }
 
@@ -68,8 +78,32 @@ func QueryProxyGroupNames(excludeNotSelectable bool) []string {
 	}
 
 	for _, p := range proxies {
-		if _, ok := p.Adapter().(outboundgroup.ProxyGroup); ok {
+		if g, ok := p.Adapter().(outboundgroup.ProxyGroup); ok {
+			// Skip hidden groups using concrete type assertions
+			hidden := false
+			switch v := g.(type) {
+			case *outboundgroup.Selector:
+				hidden = v.Hidden
+			case *outboundgroup.URLTest:
+				hidden = v.Hidden
+			case *outboundgroup.Fallback:
+				hidden = v.Hidden
+			case *outboundgroup.LoadBalance:
+				hidden = v.Hidden
+			}
+			if hidden {
+				continue
+			}
 			if !excludeNotSelectable || p.Type() == C.Selector {
+				result = append(result, p.Name())
+			}
+		} else if p.Type() == C.Smart {
+			// Smart does not implement outboundgroup.ProxyGroup (no Providers()),
+			// so handle it separately.
+			if sg, ok := p.Adapter().(*outboundgroup.Smart); ok {
+				if sg.Hidden {
+					continue
+				}
 				result = append(result, p.Name())
 			}
 		}
@@ -85,6 +119,99 @@ func QueryProxyGroup(name string, sortMode SortMode, uiSubtitlePattern *regexp2.
 		log.Warnln("Query group `%s`: not found", name)
 
 		return nil
+	}
+
+	// Smart groups do not implement outboundgroup.ProxyGroup — handle separately.
+	if p.Type() == C.Smart {
+		sg, ok := p.Adapter().(*outboundgroup.Smart)
+		if !ok {
+			log.Warnln("Query group `%s`: Smart cast failed", name)
+			return nil
+		}
+
+		proxies := convertProxies(sg.GetProxies(false), uiSubtitlePattern)
+
+		// Fetch weights from the global smart store — same source the
+		// external-controller /group/{name}/weights route uses.
+		// NodeRank.Weight is an integer 0-100 (percentage); normalise to float64.
+		proxyWeights := make(map[string]float64)
+		if store := cachefile.GetSmartStore(); store != nil {
+			if ranking, err := store.GetNodeWeightRankingCache(sg.Name(), sg.GetConfigFilename()); err == nil {
+				for _, nr := range ranking {
+					proxyWeights[nr.Name] = float64(nr.Weight) / 100.0
+				}
+			}
+		}
+
+		// Populate Weight for each proxy.
+		for _, px := range proxies {
+			if w, found := proxyWeights[px.Name]; found {
+				px.Weight = w
+			}
+		}
+
+		// Determine the best proxy name to display as "Now".
+		// sg.Now() may return a mode string like "Smart" or "Select" rather than
+		// a real proxy name, so verify it against the actual proxy list.
+		bestNow := sg.Now()
+		isRealProxy := false
+		for _, px := range proxies {
+			if px.Name == bestNow {
+				isRealProxy = true
+				break
+			}
+		}
+		if !isRealProxy {
+			bestNow = ""
+			// Priority 1: highest-weight proxy from weights API.
+			var maxWeight float64 = -1
+			for _, px := range proxies {
+				if w, found := proxyWeights[px.Name]; found && w > maxWeight {
+					maxWeight = w
+					bestNow = px.Name
+				}
+			}
+			// Priority 2: lowest-delay proxy as fallback.
+			if bestNow == "" {
+				minDelay := -1
+				for _, px := range proxies {
+					if px.Delay > 0 && (minDelay < 0 || px.Delay < minDelay) {
+						minDelay = px.Delay
+						bestNow = px.Name
+					}
+				}
+			}
+		}
+
+		switch sortMode {
+		case Title:
+			sort.Sort(&sortableProxyList{
+				list: proxies,
+				less: func(a, b *Proxy) bool { return strings.Compare(a.Title, b.Title) < 0 },
+			})
+		case Delay:
+			sort.Sort(&sortableProxyList{
+				list: proxies,
+				less: func(a, b *Proxy) bool { return a.Delay < b.Delay },
+			})
+		}
+
+		icon := sg.Icon
+		if icon != "" && config.CurrentProfileDir != "" {
+			hash := fmt.Sprintf("%x", md5.Sum([]byte(icon)))
+			cachedPath := P.Join(config.CurrentProfileDir, "icons", hash)
+			if _, err := os.Stat(cachedPath); err == nil {
+				icon = "file://" + cachedPath
+			}
+		}
+
+		return &ProxyGroup{
+			Type:    p.Type().String(),
+			Now:     bestNow,
+			Icon:    icon,
+			Hidden:  sg.Hidden,
+			Proxies: proxies,
+		}
 	}
 
 	g, ok := p.Adapter().(outboundgroup.ProxyGroup)
@@ -120,9 +247,37 @@ func QueryProxyGroup(name string, sortMode SortMode, uiSubtitlePattern *regexp2.
 	default:
 	}
 
+	icon := ""
+	hidden := false
+	switch v := g.(type) {
+	case *outboundgroup.Selector:
+		icon = v.Icon
+		hidden = v.Hidden
+	case *outboundgroup.URLTest:
+		icon = v.Icon
+		hidden = v.Hidden
+	case *outboundgroup.Fallback:
+		icon = v.Icon
+		hidden = v.Hidden
+	case *outboundgroup.LoadBalance:
+		icon = v.Icon
+		hidden = v.Hidden
+	}
+
+	// Check for cached icon file
+	if icon != "" && config.CurrentProfileDir != "" {
+		hash := fmt.Sprintf("%x", md5.Sum([]byte(icon)))
+		cachedPath := P.Join(config.CurrentProfileDir, "icons", hash)
+		if _, err := os.Stat(cachedPath); err == nil {
+			icon = "file://" + cachedPath
+		}
+	}
+
 	return &ProxyGroup{
 		Type:    g.Type().String(),
 		Now:     g.Now(),
+		Icon:    icon,
+		Hidden:  hidden,
 		Proxies: proxies,
 	}
 }
@@ -134,6 +289,21 @@ func PatchSelector(selector, name string) bool {
 		log.Warnln("Patch selector `%s`: not found", selector)
 
 		return false
+	}
+
+	// Smart implements SelectAble but not ProxyGroup — handle separately.
+	if p.Type() == C.Smart {
+		sg, ok := p.Adapter().(*outboundgroup.Smart)
+		if !ok {
+			log.Warnln("Patch selector `%s`: Smart cast failed", selector)
+			return false
+		}
+		if err := sg.Set(name); err != nil {
+			log.Warnln("Patch selector `%s`: %s", selector, err.Error())
+		}
+		log.Infoln("Patch selector %s -> %s", selector, name)
+		closeConnByGroup(selector)
+		return true
 	}
 
 	g, ok := p.Adapter().(outboundgroup.ProxyGroup)

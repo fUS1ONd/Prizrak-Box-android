@@ -12,6 +12,7 @@ data class Proxy(
     val subtitle: String,
     val type: Type,
     val delay: Int,
+    val weight: Double = 0.0,
 ) : Parcelable {
     @Suppress("unused")
     enum class Type(val group: Boolean) {
@@ -46,6 +47,7 @@ data class Proxy(
         Fallback(true),
         URLTest(true),
         LoadBalance(true),
+        Smart(true),
 
         Unknown(false);
     }

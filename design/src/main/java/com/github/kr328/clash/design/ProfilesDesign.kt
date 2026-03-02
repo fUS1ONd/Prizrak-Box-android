@@ -6,13 +6,17 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
+import com.github.kr328.clash.common.util.TvUtils
 import com.github.kr328.clash.design.adapter.ProfileAdapter
+import com.github.kr328.clash.design.component.TvNavigationDrawer
 import com.github.kr328.clash.design.databinding.DesignProfilesBinding
+import com.github.kr328.clash.design.databinding.DesignSheetAddProfileProfilesBinding
 import com.github.kr328.clash.design.databinding.DialogProfilesMenuBinding
 import com.github.kr328.clash.design.dialog.AppBottomSheetDialog
 import com.github.kr328.clash.design.ui.ToastDuration
 import com.github.kr328.clash.design.util.*
 import com.github.kr328.clash.service.model.Profile
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -20,16 +24,35 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
     sealed class Request {
         object UpdateAll : Request()
         object Create : Request()
+        object AddFromClipboard : Request()
+        object ScanQrCode : Request()
+        object AddFromFile : Request()
+        object AddManually : Request()
+        object GoHome : Request()
+        object OpenSettings : Request()
+        object ToggleStatus : Request()
         data class Active(val profile: Profile) : Request()
         data class Update(val profile: Profile) : Request()
         data class Edit(val profile: Profile) : Request()
         data class Duplicate(val profile: Profile) : Request()
         data class Delete(val profile: Profile) : Request()
+        data class OpenUrl(val url: String) : Request()
+        data class ShowAnnounce(val profile: Profile) : Request()
     }
 
     private val binding = DesignProfilesBinding
         .inflate(context.layoutInflater, context.root, false)
-    private val adapter = ProfileAdapter(context, this::requestActive, this::showMenu)
+    private val adapter = ProfileAdapter(
+        context,
+        this::requestActive,
+        this::showMenu,
+        onEditClicked = { requests.trySend(Request.Edit(it)) },
+        onDeleteClicked = { requests.trySend(Request.Delete(it)) },
+        onUpdateClicked = { requests.trySend(Request.Update(it)) },
+        onAnnounceClicked = { requests.trySend(Request.ShowAnnounce(it)) },
+        onSupportClicked = { if (it.supportUrl.isNotEmpty()) requests.trySend(Request.OpenUrl(it.supportUrl)) },
+        onWebPageClicked = { if (it.profileWebPageUrl.isNotEmpty()) requests.trySend(Request.OpenUrl(it.profileWebPageUrl)) },
+    )
 
     private var allUpdating: Boolean
         get() = adapter.states.allUpdating;
@@ -38,8 +61,33 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
         }
     private val rotateAnimation : Animation = AnimationUtils.loadAnimation(context, R.anim.rotate_infinite)
 
+    private val isTv = TvUtils.isTv(context)
+
+    private val tvDrawer: TvNavigationDrawer? = if (isTv) {
+        TvNavigationDrawer(context, TvNavigationDrawer.NavItem.Profiles).apply {
+            onNavigate = { item ->
+                when (item) {
+                    TvNavigationDrawer.NavItem.Home -> requests.trySend(Request.GoHome)
+                    TvNavigationDrawer.NavItem.Profiles -> {} // Already on profiles
+                    TvNavigationDrawer.NavItem.Settings -> requests.trySend(Request.OpenSettings)
+                }
+            }
+            onToggleStatus = { requests.trySend(Request.ToggleStatus) }
+        }
+    } else null
+
+    private val rootView: View = if (isTv) {
+        tvDrawer!!.wrapContent(binding.root)
+    } else {
+        binding.root
+    }
+
     override val root: View
-        get() = binding.root
+        get() = rootView
+
+    fun setClashRunning(running: Boolean) {
+        tvDrawer?.isClashRunning = running
+    }
 
     suspend fun patchProfiles(profiles: List<Profile>) {
         adapter.apply {
@@ -104,7 +152,35 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
     }
 
     fun requestCreate() {
-        requests.trySend(Request.Create)
+        showAddProfileSheet()
+    }
+
+    private fun showAddProfileSheet() {
+        val dialog = AppBottomSheetDialog(context)
+
+        val sheetBinding = DesignSheetAddProfileProfilesBinding
+            .inflate(context.layoutInflater, dialog.window?.decorView as ViewGroup?, false)
+
+        sheetBinding.master = this
+        sheetBinding.dialog = dialog
+
+        dialog.setContentView(sheetBinding.root)
+        dialog.show()
+    }
+
+    fun showAnnounceSheet(profile: Profile) {
+        if (profile.announce.isEmpty()) return
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle(profile.name)
+            .setMessage(profile.announce.replace("\\n", "\n"))
+            .setPositiveButton(R.string.ok, null)
+            .show()
+    }
+
+    fun requestSheet(dialog: Dialog, request: Request) {
+        dialog.dismiss()
+        requests.trySend(request)
     }
 
     private fun requestActive(profile: Profile) {

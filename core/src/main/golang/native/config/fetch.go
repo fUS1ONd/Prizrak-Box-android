@@ -25,7 +25,7 @@ type Status struct {
 }
 
 func openUrl(ctx context.Context, url string) (io.ReadCloser, error) {
-	response, err := clashHttp.HttpRequest(ctx, url, http.MethodGet, http.Header{"User-Agent": {"ClashMetaForAndroid/" + app.VersionName()}}, nil)
+	response, err := clashHttp.HttpRequest(ctx, url, http.MethodGet, http.Header{"User-Agent": {"Clash-Meta/Prizrak-Box (Android Build " + app.VersionName() + ")"}}, nil)
 
 	if err != nil {
 		return nil, err
@@ -147,6 +147,9 @@ func FetchAndValid(
 
 		_ = fetch(url, ps)
 	})
+
+	// Fetch proxy group icons
+	fetchProxyGroupIcons(rawCfg, path, reportStatus)
 
 	bytes, _ := json.Marshal(&Status{
 		Action:      "Verifying",

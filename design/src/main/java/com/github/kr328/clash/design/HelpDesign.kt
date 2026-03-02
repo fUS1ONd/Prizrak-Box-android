@@ -31,18 +31,7 @@ class HelpDesign(
         binding.scrollRoot.bindAppBarElevation(binding.activityBarLayout)
 
         val screen = preferenceScreen(context) {
-            tips(R.string.tips_help)
-
             category(R.string.document)
-
-            clickable(
-                title = R.string.clash_wiki,
-                summary = R.string.clash_wiki_url
-            ) {
-                clicked {
-                    openLink(Uri.parse(context.getString(R.string.clash_wiki_url)))
-                }
-            }
 
             clickable(
                 title = R.string.clash_meta_wiki,
@@ -70,6 +59,51 @@ class HelpDesign(
             ) {
                 clicked {
                     openLink(Uri.parse(context.getString(R.string.meta_github_url)))
+                }
+            }
+
+            clickable(
+                title = R.string.moshen_core,
+                summary = R.string.moshen_core_url
+            ) {
+                clicked {
+                    openLink(Uri.parse(context.getString(R.string.moshen_core_url)))
+                }
+            }
+
+            clickable(
+                title = R.string.mihomo_smart_core,
+                summary = R.string.mihomo_smart_core_url
+            ) {
+                clicked {
+                    openLink(Uri.parse(context.getString(R.string.mihomo_smart_core_url)))
+                }
+            }
+
+            clickable(
+                title = R.string.mihomo_xhttp_core,
+                summary = R.string.mihomo_xhttp_core_url
+            ) {
+                clicked {
+                    openLink(Uri.parse(context.getString(R.string.mihomo_xhttp_core_url)))
+                }
+            }
+
+            clickable(
+                title = R.string.moshen_fork_core,
+                summary = R.string.moshen_fork_core_url
+            ) {
+                clicked {
+                    openLink(Uri.parse(context.getString(R.string.moshen_fork_core_url)))
+                }
+            }
+
+            clickable(
+                title = R.string.cmfa_origin,
+                summary = R.string.cmfa_origin_url
+            ) {
+                clicked {
+                    openLink(Uri.parse(context.getString(R.string.cmfa_origin_url)))
                 }
             }
         }
