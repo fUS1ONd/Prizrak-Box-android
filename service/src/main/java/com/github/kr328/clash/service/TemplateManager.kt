@@ -43,6 +43,17 @@ object TemplateManager {
     private const val PREF_CUSTOM_PATH = "custom_template_path"
     private const val PREFS_NAME = "ui"
 
+    private const val KEY_TEMPLATE_ID = "templateId"
+    private const val KEY_PXA_TEMPLATE_URL = "pxaTemplateUrl"
+    private const val KEY_ALLOW_TEMPLATE_SELECTION = "allowTemplateSelection"
+    private const val KEY_PXA_TEMPLATE_SCHEME = "pxaTemplateScheme"
+
+    /**
+     * Special template id meaning "use the server-specified pxa-template URL".
+     * Stored as the selected templateId when the user picks "Шаблон из подписки".
+     */
+    const val PXA_SUBSCRIPTION_TEMPLATE_ID = "pxa_subscription"
+
     // -------------------------------------------------------------------------
     // Template content loading
     // -------------------------------------------------------------------------
@@ -72,31 +83,89 @@ object TemplateManager {
         context.assets.open(path).use { it.readBytes().toString(Charsets.UTF_8) }
 
     // -------------------------------------------------------------------------
-    // Per-profile metadata (selected template)
+    // Per-profile metadata (selected template + pxa headers)
     // -------------------------------------------------------------------------
+
+    private fun readMeta(profileDir: File): JSONObject {
+        val metaFile = profileDir.resolve(META_FILE)
+        if (!metaFile.exists()) return JSONObject()
+        return try { JSONObject(metaFile.readText()) } catch (_: Exception) { JSONObject() }
+    }
+
+    private fun writeMeta(profileDir: File, json: JSONObject) {
+        profileDir.mkdirs()
+        profileDir.resolve(META_FILE).writeText(json.toString(), Charsets.UTF_8)
+    }
 
     /**
      * Returns the template id stored in [profileDir]/[META_FILE], or
      * [Template.Default.id] when the file is absent / malformed.
      */
-    fun getSelectedTemplateId(profileDir: File): String {
-        val metaFile = profileDir.resolve(META_FILE)
-        if (!metaFile.exists()) return Template.Default.id
-        return try {
-            JSONObject(metaFile.readText()).optString("templateId", Template.Default.id)
-        } catch (_: Exception) {
-            Template.Default.id
-        }
+    fun getSelectedTemplateId(profileDir: File): String =
+        readMeta(profileDir).optString(KEY_TEMPLATE_ID, Template.Default.id)
+
+    /**
+     * Persists [templateId] to [profileDir]/[META_FILE], preserving any
+     * other fields (pxa meta) already present.
+     */
+    fun saveSelectedTemplateId(profileDir: File, templateId: String) {
+        val json = readMeta(profileDir)
+        json.put(KEY_TEMPLATE_ID, templateId)
+        writeMeta(profileDir, json)
     }
 
     /**
-     * Persists [templateId] to [profileDir]/[META_FILE].
-     * Creates parent directories as needed.
+     * Returns the pxa-template URL stored in [profileDir]/[META_FILE], or null
+     * if not set. When non-null, this URL is used as the conversion template
+     * instead of the user-selected built-in template.
      */
-    fun saveSelectedTemplateId(profileDir: File, templateId: String) {
-        profileDir.mkdirs()
-        val json = JSONObject().apply { put("templateId", templateId) }
-        profileDir.resolve(META_FILE).writeText(json.toString(), Charsets.UTF_8)
+    fun getPxaTemplateUrl(profileDir: File): String? =
+        readMeta(profileDir).optString(KEY_PXA_TEMPLATE_URL, "").ifBlank { null }
+
+    /**
+     * Returns whether the user is allowed to change the conversion template for
+     * this profile. Defaults to true when no metadata is stored.
+     *
+     * - If no pxa-template header: always true (normal behavior).
+     * - If pxa-template present: false, unless pxa-change-template also present.
+     */
+    fun isTemplateSelectionAllowed(profileDir: File): Boolean =
+        readMeta(profileDir).optBoolean(KEY_ALLOW_TEMPLATE_SELECTION, true)
+
+    /**
+     * Returns the pxa-template-scheme value stored for this profile, e.g. "proxy-providers".
+     * Null when not set (normal convert.go mode).
+     */
+    fun getPxaTemplateScheme(profileDir: File): String? =
+        readMeta(profileDir).optString(KEY_PXA_TEMPLATE_SCHEME, "").ifBlank { null }
+
+    /**
+     * Saves pxa header values to [profileDir]/[META_FILE], preserving the
+     * existing selected template id.
+     *
+     * @param pxaTemplateUrl        URL from the pxa-template response header, or null to clear.
+     * @param allowTemplateSelection Whether the user may change the template.
+     * @param pxaTemplateScheme     Value of pxa-template-scheme header (e.g. "proxy-providers"), or null to clear.
+     */
+    fun savePxaMeta(
+        profileDir: File,
+        pxaTemplateUrl: String?,
+        allowTemplateSelection: Boolean,
+        pxaTemplateScheme: String? = null,
+    ) {
+        val json = readMeta(profileDir)
+        if (!pxaTemplateUrl.isNullOrBlank()) {
+            json.put(KEY_PXA_TEMPLATE_URL, pxaTemplateUrl)
+        } else {
+            json.remove(KEY_PXA_TEMPLATE_URL)
+        }
+        json.put(KEY_ALLOW_TEMPLATE_SELECTION, allowTemplateSelection)
+        if (!pxaTemplateScheme.isNullOrBlank()) {
+            json.put(KEY_PXA_TEMPLATE_SCHEME, pxaTemplateScheme)
+        } else {
+            json.remove(KEY_PXA_TEMPLATE_SCHEME)
+        }
+        writeMeta(profileDir, json)
     }
 
     /**
