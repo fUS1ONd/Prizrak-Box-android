@@ -18,6 +18,7 @@ import com.github.kr328.clash.design.ui.ToastDuration
 import com.github.kr328.clash.design.util.*
 import com.github.kr328.clash.service.model.Profile
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -39,6 +40,7 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
         data class Delete(val profile: Profile) : Request()
         data class OpenUrl(val url: String) : Request()
         data class ShowAnnounce(val profile: Profile) : Request()
+        object TvImport : Request()
     }
 
     private val binding = DesignProfilesBinding
@@ -49,7 +51,14 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
         this::showMenu,
         onEditClicked = { requests.trySend(Request.Edit(it)) },
         onDeleteClicked = { requests.trySend(Request.Delete(it)) },
-        onUpdateClicked = { requests.trySend(Request.Update(it)) },
+        onUpdateClicked = { profile ->
+            if (updatingProfiles.contains(profile.uuid) || allUpdating) {
+                showAlreadyUpdatingDialog()
+            } else {
+                updatingProfiles.add(profile.uuid)
+                requests.trySend(Request.Update(profile))
+            }
+        },
         onAnnounceClicked = { requests.trySend(Request.ShowAnnounce(it)) },
         onSupportClicked = { if (it.supportUrl.isNotEmpty()) requests.trySend(Request.OpenUrl(it.supportUrl)) },
         onWebPageClicked = { if (it.profileWebPageUrl.isNotEmpty()) requests.trySend(Request.OpenUrl(it.profileWebPageUrl)) },
@@ -60,6 +69,7 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
         set(value) {
             adapter.states.allUpdating = value
         }
+    private val updatingProfiles = mutableSetOf<UUID>()
     private val rotateAnimation : Animation = AnimationUtils.loadAnimation(context, R.anim.rotate_infinite)
 
     private val isTv = TvUtils.isTv(context)
@@ -148,6 +158,10 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
     }
 
     fun requestUpdateAll() {
+        if (allUpdating) {
+            showAlreadyUpdatingDialog()
+            return
+        }
         allUpdating = true;
         changeUpdateAllButtonStatus()
         requests.trySend(Request.UpdateAll)
@@ -170,6 +184,7 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
 
         sheetBinding.master = this
         sheetBinding.dialog = dialog
+        sheetBinding.isTv = isTv
 
         dialog.setContentView(sheetBinding.root)
         dialog.show()
@@ -195,9 +210,13 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
     }
 
     fun requestUpdate(dialog: Dialog, profile: Profile) {
-        requests.trySend(Request.Update(profile))
-
         dialog.dismiss()
+        if (updatingProfiles.contains(profile.uuid) || allUpdating) {
+            showAlreadyUpdatingDialog()
+        } else {
+            updatingProfiles.add(profile.uuid)
+            requests.trySend(Request.Update(profile))
+        }
     }
 
     fun requestEdit(dialog: Dialog, profile: Profile) {
@@ -216,6 +235,18 @@ class ProfilesDesign(context: Context) : Design<ProfilesDesign.Request>(context)
         requests.trySend(Request.Delete(profile))
 
         dialog.dismiss()
+    }
+
+    fun markProfileFinished(uuid: UUID) {
+        updatingProfiles.remove(uuid)
+    }
+
+    private fun showAlreadyUpdatingDialog() {
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.profile_updating_title)
+            .setMessage(R.string.profile_updating_message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun changeUpdateAllButtonStatus() {

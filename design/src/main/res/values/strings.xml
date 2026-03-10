@@ -354,6 +354,8 @@
     <string name="geofile_imported">%1$s imported</string>
     <string name="toast_profile_updated_complete">Update profile %s completed</string>
     <string name="toast_profile_updated_failed">Update profile %1$s failed: %2$s</string>
+    <string name="profile_updating_title">Update Already In Progress</string>
+    <string name="profile_updating_message">Profile update is currently in progress. Please wait for it to complete before starting another one.</string>
     <string name="external_control_activity">External Control</string>
     <string name="external_control_started">Prizrak-Box service started</string>
     <string name="external_control_stopped">Prizrak-Box service stopped</string>
@@ -381,6 +383,15 @@
     <string name="scan_qr_code">Scan QR Code</string>
     <string name="add_manually">Add Manually</string>
     <string name="add_from_file">Add from File</string>
+    <string name="add_from_tv">From another device</string>
+    <string name="add_from_tv_badge">Wi-Fi</string>
+    <string name="add_from_tv_summary">Import profile via Wi-Fi using QR code</string>
+    <string name="tv_import_title">Import from another device</string>
+    <string name="tv_import_qr_desc">QR code for Wi-Fi import</string>
+    <string name="tv_import_loading">Getting network address…</string>
+    <string name="tv_import_instruction">Open the link in Prizrak-Box Android or a browser\non a device connected to the same Wi-Fi</string>
+    <string name="tv_import_received">Profile received, importing…</string>
+    <string name="tv_import_no_wifi">Device is not connected to Wi-Fi</string>
     <string name="manage_profiles">Profiles</string>
     <string name="new_profile_btn">New Profile</string>
     <string name="update_subscriptions">Update Subscriptions</string>
@@ -446,4 +457,13 @@
     <string name="shortcut_start_long">Start Clash service</string>
     <string name="shortcut_stop_short">Stop Clash</string>
     <string name="shortcut_stop_long">Stop Clash service</string>
+
+    <!-- TV profile send dialog -->
+    <string name="tv_send_profile_title">Transfer Profile to TV\n%s</string>
+    <string name="tv_send_button">Transfer</string>
+    <string name="tv_send_success">Profile sent successfully</string>
+    <string name="tv_send_error">Failed to send profile</string>
+    <string name="tv_send_no_profiles">No imported profiles to transfer</string>
+    <string name="tv_profile_type_url">URL</string>
+    <string name="tv_profile_type_yaml">YAML</string>
 </resources>

@@ -15,6 +15,7 @@ import com.github.kr328.clash.design.R
 import com.github.kr328.clash.design.model.ProfileProvider
 import com.github.kr328.clash.design.util.showExceptionToast
 import com.github.kr328.clash.service.model.Profile
+import com.github.kr328.clash.util.sendProfileToTv
 import com.github.kr328.clash.util.withProfile
 import io.github.g00fy2.quickie.QRResult
 import io.github.g00fy2.quickie.QRResult.QRError
@@ -175,7 +176,11 @@ class NewProfileActivity : BaseActivity<NewProfileDesign>() {
                     val url = result.content.rawValue
                         ?: result.content.rawBytes?.let { String(it) }.orEmpty()
 
-                    createProfileByQrCode(url)
+                    if (url.contains("/Prizrak-BoxTVimport")) {
+                        sendProfileToTv(url)
+                    } else {
+                        createProfileByQrCode(url)
+                    }
                 }
 
                 QRUserCanceled -> {}

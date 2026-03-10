@@ -338,6 +338,15 @@
     <string name="scan_qr_code">Сканировать QR</string>
     <string name="add_manually">Добавить вручную</string>
     <string name="add_from_file">Добавить из файла</string>
+    <string name="add_from_tv">С другого устройства</string>
+    <string name="add_from_tv_badge">Wi-Fi</string>
+    <string name="add_from_tv_summary">Импорт профиля по Wi-Fi через QR-код</string>
+    <string name="tv_import_title">Импорт с другого устройства</string>
+    <string name="tv_import_qr_desc">QR-код для импорта по Wi-Fi</string>
+    <string name="tv_import_loading">Определяется сетевой адрес…</string>
+    <string name="tv_import_instruction">Откройте ссылку в Prizrak-Box Android или браузере\nна устройстве в той же сети Wi-Fi</string>
+    <string name="tv_import_received">Профиль получен, импортируется…</string>
+    <string name="tv_import_no_wifi">Устройство не подключено к Wi-Fi</string>
     <string name="manage_profiles">Профили</string>
     <string name="new_profile_btn">Новый профиль</string>
     <string name="update_subscriptions">Обновить подписки</string>
@@ -348,6 +357,8 @@
     <string name="hide_from_recents_desc">Скрыть приложение из списка недавних</string>
     <string name="toast_profile_updated_complete">Обновление профиля %s завершено</string>
     <string name="toast_profile_updated_failed">Обновление профиля %1$s не удалось: %2$s</string>
+    <string name="profile_updating_title">Обновление уже выполняется</string>
+    <string name="profile_updating_message">Обновление профиля уже выполняется. Пожалуйста, подождите его завершения перед началом нового.</string>
     <string name="external_control_activity">Внешнее управление</string>
     <string name="proxy_groups">Группы прокси</string>
     <string name="format_delay_ms">%d мс</string>
@@ -410,4 +421,13 @@
     <string name="shortcut_start_long">Запустить сервис Clash</string>
     <string name="shortcut_stop_short">Остановить Clash</string>
     <string name="shortcut_stop_long">Остановить сервис Clash</string>
+
+    <!-- TV profile send dialog -->
+    <string name="tv_send_profile_title">Передать профиль на TV\n%s</string>
+    <string name="tv_send_button">Передать</string>
+    <string name="tv_send_success">Профиль успешно отправлен</string>
+    <string name="tv_send_error">Ошибка отправки профиля</string>
+    <string name="tv_send_no_profiles">Нет импортированных профилей для передачи</string>
+    <string name="tv_profile_type_url">URL</string>
+    <string name="tv_profile_type_yaml">YAML</string>
 </resources>

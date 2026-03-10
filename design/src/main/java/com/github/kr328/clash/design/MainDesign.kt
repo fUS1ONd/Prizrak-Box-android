@@ -22,7 +22,6 @@ import android.widget.LinearLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
 import com.github.kr328.clash.common.util.TvUtils
 import com.github.kr328.clash.core.model.ProxyGroup
 import com.github.kr328.clash.core.model.TunnelState
@@ -66,6 +65,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         ScanQrCode,
         AddFromFile,
         AddManually,
+        TvImport,
         OpenHelp,
         OpenAbout,
         CheckUpdate,
@@ -772,6 +772,13 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
             (proxyGroupRecyclerView?.layoutManager as? LinearLayoutManager)
                 ?.scrollToPositionWithOffset(savedFirstPos, savedFirstOffset)
         }
+
+        // On TV: replacing setContentView() detaches the previously focused view, which
+        // causes Android to search for the next focusable across all windows and land on
+        // the sidebar toggle button. Restore focus inside the dialog immediately.
+        if (isTv) {
+            proxyGroupRecyclerView?.post { proxyGroupRecyclerView?.requestFocus() }
+        }
     }
 
     private fun openProxyGroupSheet(groupName: String) {
@@ -788,6 +795,11 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
 
         dialog.setContentView(buildProxyGroupSheet(groupName, group, latestProxyGroups, latestUseDots))
         if (!dialog.isShowing) dialog.show()
+
+        // On TV: ensure D-pad focus starts inside the dialog, not in the main window sidebar.
+        if (isTv) {
+            proxyGroupRecyclerView?.post { proxyGroupRecyclerView?.requestFocus() }
+        }
 
         pendingUrlTestGroup = groupName
         requests.trySend(Request.UrlTest)
@@ -907,7 +919,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 this.versionName = versionName
             }
 
-            AlertDialog.Builder(context)
+            MaterialAlertDialogBuilder(context)
                 .setView(binding.root)
                 .setPositiveButton(R.string.check_for_updates) { _, _ ->
                     requests.trySend(Request.CheckUpdate)
@@ -918,7 +930,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
 
     suspend fun showUpdateAvailableDialog(tagName: String, downloadUrl: String) {
         withContext(Dispatchers.Main) {
-            AlertDialog.Builder(context)
+            MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.update_available_title)
                 .setMessage(context.getString(R.string.update_available_message, tagName))
                 .setPositiveButton(R.string.update_download) { _, _ ->
@@ -933,7 +945,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
 
     suspend fun showUpdateNotFoundDialog() {
         withContext(Dispatchers.Main) {
-            AlertDialog.Builder(context)
+            MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.update_not_found_title)
                 .setMessage(R.string.update_not_found_message)
                 .setPositiveButton(android.R.string.ok, null)
@@ -943,7 +955,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
 
     suspend fun showUpdateErrorDialog(message: String) {
         withContext(Dispatchers.Main) {
-            AlertDialog.Builder(context)
+            MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.update_error_title)
                 .setMessage(message)
                 .setPositiveButton(android.R.string.ok, null)
@@ -959,6 +971,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
 
         sheetBinding.master = this
         sheetBinding.dialog = dialog
+        sheetBinding.isTv = isTv
 
         dialog.setContentView(sheetBinding.root)
         dialog.show()

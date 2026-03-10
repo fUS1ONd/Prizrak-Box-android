@@ -9,6 +9,7 @@ import com.github.kr328.clash.design.ProfilesDesign
 import com.github.kr328.clash.design.ui.ToastDuration
 import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.util.importProfileFromUrl
+import com.github.kr328.clash.util.sendProfileToTv
 import com.github.kr328.clash.util.startClashService
 import com.github.kr328.clash.util.stopClashService
 import com.github.kr328.clash.util.withProfile
@@ -33,7 +34,11 @@ class ProfilesActivity : BaseActivity<ProfilesDesign>() {
                     val url = result.content.rawValue
                         ?: result.content.rawBytes?.let { String(it) }.orEmpty()
                     if (url.isNotEmpty()) {
-                        importProfileFromUrl(url)
+                        if (url.contains("/Prizrak-BoxTVimport")) {
+                            sendProfileToTv(url)
+                        } else {
+                            importProfileFromUrl(url)
+                        }
                     }
                 }
                 QRResult.QRUserCanceled -> {}
@@ -149,6 +154,8 @@ class ProfilesActivity : BaseActivity<ProfilesDesign>() {
                         }
                         ProfilesDesign.Request.OpenSettings ->
                             startActivity(SettingsActivity::class.intent)
+                        ProfilesDesign.Request.TvImport ->
+                            startActivity(TvImportActivity::class.intent)
                         ProfilesDesign.Request.ToggleStatus -> {
                             if (clashRunning) {
                                 stopClashService()
@@ -194,10 +201,18 @@ class ProfilesActivity : BaseActivity<ProfilesDesign>() {
         }
     }
 
+    override fun onProfileUpdateCompleted(uuid: UUID?) {
+        super.onProfileUpdateCompleted(uuid)
+        if (uuid != null) {
+            launch { design?.markProfileFinished(uuid) }
+        }
+    }
+
     override fun onProfileUpdateFailed(uuid: UUID?, reason: String?) {
         if(uuid == null)
             return;
         launch {
+            design?.markProfileFinished(uuid)
             var name: String? = null;
             withProfile {
                 name = queryByUUID(uuid)?.name
