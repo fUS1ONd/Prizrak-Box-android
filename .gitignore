@@ -28,7 +28,7 @@ gradle-app.setting
 !/core/src/premium/golang/.idea/codeStyles
 
 # Ignore builtin geofiles (but allow hand-crafted assets)
-app/src/main/assets
+app/src/main/assets/*
 !app/src/main/assets/tv_import_web.html
 
 # KeyStore
