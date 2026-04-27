@@ -111,7 +111,7 @@ class MainActivity : BaseActivity<MainDesign>() {
                         MainDesign.Request.OpenProviders ->
                             startActivity(ProvidersActivity::class.intent)
                         MainDesign.Request.OpenSettings -> {
-                            startActivity(SettingsActivity::class.intent)
+                            startActivity(SettingsActivity::class.intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION))
                             overridePendingTransition(0, 0)
                         }
                         MainDesign.Request.ManageProfiles ->
@@ -222,12 +222,18 @@ class MainActivity : BaseActivity<MainDesign>() {
 
     private suspend fun MainDesign.fetchProxyGroups() {
         try {
+            val activeLatencyDots = withProfile { queryActive()?.latencyDots ?: -1 }
+            val effectiveDots = when (activeLatencyDots) {
+                0 -> false
+                1 -> true
+                else -> uiStore.delayDisplayDots
+            }
             withClash {
                 val names = queryProxyGroupNames(uiStore.proxyExcludeNotSelectable)
                 val groups = names.map { name ->
                     name to queryProxyGroup(name, uiStore.proxySort)
                 }.filter { !it.second.hidden }
-                setProxyGroups(groups, uiStore.delayDisplayDots)
+                setProxyGroups(groups, effectiveDots)
             }
         } catch (_: Exception) {
             // Proxy groups may not be available yet

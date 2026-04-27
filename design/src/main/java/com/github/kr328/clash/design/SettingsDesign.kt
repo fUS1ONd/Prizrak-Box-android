@@ -12,7 +12,7 @@ import com.github.kr328.clash.design.util.root
 class SettingsDesign(context: Context) : Design<SettingsDesign.Request>(context) {
     enum class Request {
         StartApp, StartNetwork, StartOverride, StartMetaFeature,
-        StartProviders, StartLogs, StartAbout,
+        StartProviders, StartConnections, StartLogs, StartAbout,
         GoHome, OpenProfiles, ToggleStatus,
     }
 
@@ -52,6 +52,7 @@ class SettingsDesign(context: Context) : Design<SettingsDesign.Request>(context)
 
     fun setClashRunning(running: Boolean) {
         tvDrawer?.isClashRunning = running
+        binding.clashRunning = running
     }
 
     init {

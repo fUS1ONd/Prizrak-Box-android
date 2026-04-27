@@ -231,8 +231,6 @@
     <string name="moshen_core_url" translatable="false">https://github.com/snakem982/mihomo/tree/moshen/</string>
     <string name="mihomo_smart_core">Mihomo Smart Core</string>
     <string name="mihomo_smart_core_url" translatable="false">https://github.com/vernesong/mihomo/releases</string>
-    <string name="mihomo_xhttp_core">Ядро mihomo + xhttp</string>
-    <string name="mihomo_xhttp_core_url" translatable="false">https://github.com/daiaji/mihomo/tree/feat/splithttp</string>
     <string name="moshen_fork_core">Ядро moshen fork</string>
     <string name="moshen_fork_core_url" translatable="false">https://github.com/legiz-ru/moshen/releases</string>
     <string name="cmfa_origin">CMFA</string>
@@ -392,6 +390,8 @@
     <string name="tv_import_instruction">Open the link in Prizrak-Box Android or a browser\non a device connected to the same Wi-Fi</string>
     <string name="tv_import_received">Profile received, importing…</string>
     <string name="tv_import_no_wifi">Device is not connected to Wi-Fi</string>
+    <string name="tv_import_ip_label">IP-адрес</string>
+    <string name="tv_import_port_label">Порт</string>
     <string name="manage_profiles">Profiles</string>
     <string name="new_profile_btn">New Profile</string>
     <string name="update_subscriptions">Update Subscriptions</string>
@@ -468,4 +468,66 @@
     <string name="tv_send_no_profiles">No imported profiles to transfer</string>
     <string name="tv_profile_type_url">URL</string>
     <string name="tv_profile_type_yaml">YAML</string>
+
+    <!-- Connections -->
+    <string name="connections">Connections</string>
+    <string name="connections_active">Active</string>
+    <string name="connections_closed">Closed</string>
+    <string name="connections_pause">Pause</string>
+    <string name="connections_resume">Resume</string>
+    <string name="connections_kill_all">Kill All</string>
+    <string name="connections_cache_closed">Cache closed connections</string>
+    <string name="connections_search_hint">Search…</string>
+    <string name="connections_empty">No connections</string>
+    <string name="prizrak_core_name">Prizrak (mihomo core)</string>
+    <string name="conn_detail_traffic">TRAFFIC</string>
+    <string name="conn_detail_routing">ROUTING</string>
+    <string name="conn_detail_network">NETWORK</string>
+    <string name="conn_detail_process">PROCESS</string>
+    <string name="conn_detail_inbound">INBOUND</string>
+    <string name="conn_detail_other">OTHER</string>
+    <string name="conn_upload_speed">Upload speed</string>
+    <string name="conn_download_speed">Download speed</string>
+    <string name="conn_upload">Upload</string>
+    <string name="conn_download">Download</string>
+    <string name="conn_rule">Rule</string>
+    <string name="conn_proxy_chain">Proxy chain</string>
+    <string name="conn_type">Type</string>
+    <string name="conn_host">Host</string>
+    <string name="conn_sniff_host">Sniffed host</string>
+    <string name="conn_dest_ip">Destination IP</string>
+    <string name="conn_dest_geoip">Destination GeoIP</string>
+    <string name="conn_dest_asn">Destination ASN</string>
+    <string name="conn_src_ip">Source IP</string>
+    <string name="conn_src_geoip">Source GeoIP</string>
+    <string name="conn_src_asn">Source ASN</string>
+    <string name="conn_src_port">Source port</string>
+    <string name="conn_dest_port">Destination port</string>
+    <string name="conn_remote_dest">Remote destination</string>
+    <string name="conn_process">Process</string>
+    <string name="conn_process_path">Process path</string>
+    <string name="conn_inbound_ip">Inbound IP</string>
+    <string name="conn_inbound_port">Inbound port</string>
+    <string name="conn_inbound_name">Inbound name</string>
+    <string name="conn_inbound_user">Inbound user</string>
+    <string name="conn_dns_mode">DNS mode</string>
+    <string name="conn_special_proxy">Special proxy</string>
+    <string name="conn_special_rules">Special rules</string>
+    <string name="conn_dscp">DSCP</string>
+    <string name="conn_duration">Duration</string>
+
+    <string name="connections_kill_all_confirm_title">Close all connections?</string>
+    <string name="connections_kill_all_confirm_msg">All active connections will be terminated.</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="copy_process_name">Copy process name</string>
+    <string name="open_app">Open app</string>
+    <string name="open_in_store">Open in store</string>
+    <string name="copy_address">Copy address</string>
+    <string name="open_ip_info">Look up on ipinfo.io</string>
+    <string name="open_in_browser">Open in browser</string>
+    <string name="copy_host">Copy host</string>
+    <string name="connections_cache_enabled">Closed connections logging on</string>
+    <string name="connections_cache_disabled">Closed connections logging off</string>
+    <string name="copy_json">Copy JSON</string>
 </resources>
