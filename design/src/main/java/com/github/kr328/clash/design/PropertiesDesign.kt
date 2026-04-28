@@ -2,10 +2,13 @@ package com.github.kr328.clash.design
 
 import android.content.Context
 import android.view.View
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.kr328.clash.core.model.FetchStatus
+import com.github.kr328.clash.design.adapter.ProxyLinkAdapter
 import com.github.kr328.clash.design.databinding.DesignPropertiesBinding
 import com.github.kr328.clash.design.dialog.ModelProgressBarConfigure
 import com.github.kr328.clash.design.dialog.requestModelTextInput
+import com.github.kr328.clash.design.dialog.requestMultilineTextInput
 import com.github.kr328.clash.design.dialog.withModelProgressBar
 import com.github.kr328.clash.design.util.*
 import com.github.kr328.clash.service.model.Profile
@@ -22,10 +25,16 @@ class PropertiesDesign(context: Context) : Design<PropertiesDesign.Request>(cont
         object Commit : Request()
         object BrowseFiles : Request()
         object SelectTemplate : Request()
+        object ScanQrForLinks : Request()
     }
 
     private val binding = DesignPropertiesBinding
         .inflate(context.layoutInflater, context.root, false)
+
+    private val proxyLinkAdapter = ProxyLinkAdapter(
+        onEdit = { index, url -> launch { editProxyLink(index, url) } },
+        onDelete = { index -> deleteProxyLink(index) },
+    )
 
     override val root: View
         get() = binding.root
@@ -34,6 +43,9 @@ class PropertiesDesign(context: Context) : Design<PropertiesDesign.Request>(cont
         get() = binding.profile!!
         set(value) {
             binding.profile = value
+            if (value.type == Profile.Type.Converted) {
+                proxyLinkAdapter.links = parseLinks(value.source)
+            }
         }
 
     val progressing: Boolean
@@ -83,6 +95,11 @@ class PropertiesDesign(context: Context) : Design<PropertiesDesign.Request>(cont
         binding.activityBarLayout.applyFrom(context)
 
         binding.scrollRoot.bindAppBarElevation(binding.activityBarLayout)
+
+        binding.proxyLinksRecycler.apply {
+            layoutManager = LinearLayoutManager(context)
+            adapter = proxyLinkAdapter
+        }
     }
 
     fun inputName() {
@@ -145,6 +162,69 @@ class PropertiesDesign(context: Context) : Design<PropertiesDesign.Request>(cont
             }
         }
     }
+
+    fun addProxyLinks() {
+        launch {
+            val choice = withContext(Dispatchers.Main) {
+                suspendCancellableCoroutine { cont ->
+                    val options = arrayOf(
+                        context.getString(R.string.paste_links),
+                        context.getString(R.string.scan_qr_code),
+                    )
+                    val dlg = MaterialAlertDialogBuilder(context)
+                        .setTitle(R.string.add_proxy_links)
+                        .setItems(options) { _, which -> if (!cont.isCompleted) cont.resume(which) }
+                        .setNegativeButton(R.string.cancel) { _, _ -> if (!cont.isCompleted) cont.resume(-1) }
+                        .setOnDismissListener { if (!cont.isCompleted) cont.resume(-1) }
+                        .show()
+                    cont.invokeOnCancellation { dlg.dismiss() }
+                }
+            }
+            when (choice) {
+                0 -> pasteProxyLinks()
+                1 -> requests.trySend(Request.ScanQrForLinks)
+            }
+        }
+    }
+
+    fun appendProxyLinksFromText(text: String) {
+        val newLinks = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (newLinks.isNotEmpty()) {
+            val combined = proxyLinkAdapter.links + newLinks
+            profile = profile.copy(source = combined.joinToString("\n"))
+        }
+    }
+
+    private suspend fun pasteProxyLinks() {
+        val text = context.requestMultilineTextInput(
+            initial = "",
+            title = context.getText(R.string.add_proxy_links),
+            hint = context.getText(R.string.add_proxy_links_hint),
+        )
+        appendProxyLinksFromText(text)
+    }
+
+    private suspend fun editProxyLink(index: Int, url: String) {
+        val newUrl = context.requestModelTextInput(
+            initial = url,
+            title = context.getText(R.string.proxy_link_edit),
+            hint = context.getText(R.string.proxy_link_edit_hint),
+            error = context.getText(R.string.should_not_be_blank),
+            validator = ValidatorNotBlank,
+        )
+        if (newUrl != url) {
+            val updated = proxyLinkAdapter.links.toMutableList().also { it[index] = newUrl }
+            profile = profile.copy(source = updated.joinToString("\n"))
+        }
+    }
+
+    private fun deleteProxyLink(index: Int) {
+        val updated = proxyLinkAdapter.links.toMutableList().also { it.removeAt(index) }
+        profile = profile.copy(source = updated.joinToString("\n"))
+    }
+
+    private fun parseLinks(source: String): List<String> =
+        source.lines().map { it.trim() }.filter { it.isNotBlank() }
 
     fun requestCommit() {
         requests.trySend(Request.Commit)

@@ -20,6 +20,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.RadioButton
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import android.widget.TextView
@@ -44,8 +45,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.databinding.OnRebindCallback
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.net.URL
+import kotlin.coroutines.resume
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,6 +76,8 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         CheckUpdate,
         SelectProxy,
         UrlTest,
+        OpenConnections,
+        OpenModeSelector,
     }
 
     private val binding = DesignMainBinding
@@ -251,6 +257,14 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 binding.profileAnnounce = profile.announce.replace("\\n", "\n")
                 binding.profileLogoUrl = profile.profileLogo
                 binding.profileTitleOverride = profile.profileTitle
+                binding.profileGlobalModeMp = profile.globalModeMp
+                binding.profileConnsViewMp = profile.connsViewMp
+                binding.profileRpMp = profile.rpMp
+
+                // Wire click listeners for shortcut icons
+                binding.btnModeSelector?.setOnClickListener { requests.trySend(Request.OpenModeSelector) }
+                binding.btnOpenConnections?.setOnClickListener { requests.trySend(Request.OpenConnections) }
+                binding.btnOpenProviders?.setOnClickListener { requests.trySend(Request.OpenProviders) }
 
                 // Wire click listeners for support/webpage icons
                 binding.profileSupportIcon?.setOnClickListener {
@@ -294,6 +308,9 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 binding.profileAnnounce = null
                 binding.profileLogoUrl = null
                 binding.profileTitleOverride = null
+                binding.profileGlobalModeMp = false
+                binding.profileConnsViewMp = false
+                binding.profileRpMp = false
                 // Reset logo and title to defaults
                 binding.appLogo.setImageResource(R.drawable.ic_clash)
                 binding.appLogo.imageTintList = null
@@ -1156,6 +1173,100 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                         ?: findFirstFocusableIn(container)
                     target?.requestFocus()
                 }
+            }
+        }
+    }
+
+    suspend fun showModeDialog(currentMode: TunnelState.Mode): TunnelState.Mode? {
+        return withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine { cont ->
+                val modes = arrayOf(TunnelState.Mode.Rule, TunnelState.Mode.Global)
+                val labels = arrayOf(
+                    context.getString(R.string.mode_rule_label),
+                    context.getString(R.string.mode_global_label),
+                )
+                val descriptions = arrayOf(
+                    context.getString(R.string.mode_rule_desc),
+                    context.getString(R.string.mode_global_desc),
+                )
+                val currentIndex = modes.indexOfFirst { it == currentMode }.coerceAtLeast(0)
+
+                val dp = context.resources.displayMetrics.density
+                val onSurfaceColor = context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
+                val onSurfaceVariantColor = context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+
+                val radioButtons = mutableListOf<RadioButton>()
+                var dialogRef: androidx.appcompat.app.AlertDialog? = null
+
+                val container = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(0, (4 * dp).toInt(), 0, (4 * dp).toInt())
+                }
+
+                modes.forEachIndexed { index, mode ->
+                    val rb = RadioButton(context).apply {
+                        isChecked = (index == currentIndex)
+                        isClickable = false
+                        isFocusable = false
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                        ).apply { marginEnd = (4 * dp).toInt() }
+                    }
+                    radioButtons.add(rb)
+
+                    val titleView = TextView(context).apply {
+                        text = labels[index]
+                        textSize = 16f
+                        setTypeface(typeface, Typeface.NORMAL)
+                        setTextColor(onSurfaceColor)
+                    }
+
+                    val descView = TextView(context).apply {
+                        text = descriptions[index]
+                        textSize = 13f
+                        setTextColor(onSurfaceVariantColor)
+                        setPadding(0, (2 * dp).toInt(), 0, 0)
+                    }
+
+                    val textCol = LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                        )
+                        addView(titleView)
+                        addView(descView)
+                    }
+
+                    val row = LinearLayout(context).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        setPadding((8 * dp).toInt(), (14 * dp).toInt(), (24 * dp).toInt(), (14 * dp).toInt())
+                        isClickable = true
+                        isFocusable = true
+                        background = context.getDrawable(R.drawable.bg_accordion_header_ripple)
+                        addView(rb)
+                        addView(textCol)
+                        setOnClickListener {
+                            radioButtons.forEachIndexed { i, r -> r.isChecked = (i == index) }
+                            dialogRef?.dismiss()
+                            if (!cont.isCompleted) cont.resume(mode)
+                        }
+                    }
+                    container.addView(row)
+                }
+
+                val dialog = MaterialAlertDialogBuilder(context)
+                    .setTitle(R.string.mode_selector_title)
+                    .setView(container)
+                    .setNegativeButton(R.string.cancel) { _, _ ->
+                        if (!cont.isCompleted) cont.resume(null)
+                    }
+                    .setOnDismissListener { if (!cont.isCompleted) cont.resume(null) }
+                    .show()
+
+                dialogRef = dialog
+                cont.invokeOnCancellation { dialog.dismiss() }
             }
         }
     }
