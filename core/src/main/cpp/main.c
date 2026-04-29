@@ -247,6 +247,40 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeQueryProviders(JNIEnv *env,
     return new_string(response);
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_github_kr328_clash_core_bridge_Bridge_nativeDumpRuleProviderToText(JNIEnv *env,
+                                                                             jobject thiz,
+                                                                             jstring name,
+                                                                             jstring output_path) {
+    TRACE_METHOD();
+
+    scoped_string _name = get_string(name);
+    scoped_string _output_path = get_string(output_path);
+
+    scoped_string err = dumpRuleProviderToText(_name, _output_path);
+
+    if (err == NULL)
+        return NULL;
+
+    return new_string(err);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_github_kr328_clash_core_bridge_Bridge_nativeQueryRuleProviderFilePath(JNIEnv *env,
+                                                                               jobject thiz,
+                                                                               jstring name) {
+    TRACE_METHOD();
+
+    scoped_string _name = get_string(name);
+
+    scoped_string response = queryRuleProviderFilePath(_name);
+
+    if (response == NULL)
+        return NULL;
+
+    return new_string(response);
+}
+
 JNIEXPORT void JNICALL
 Java_com_github_kr328_clash_core_bridge_Bridge_nativeUpdateProvider(JNIEnv *env, jobject thiz,
                                                                     jobject completable,

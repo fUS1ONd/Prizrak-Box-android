@@ -96,6 +96,24 @@ func queryProviders() *C.char {
 	return marshalJson(tunnel.QueryProviders())
 }
 
+//export queryRuleProviderFilePath
+func queryRuleProviderFilePath(name C.c_string) *C.char {
+	path := tunnel.QueryRuleProviderFilePath(C.GoString(name))
+	if path == "" {
+		return nil
+	}
+	return C.CString(path)
+}
+
+//export dumpRuleProviderToText
+func dumpRuleProviderToText(name C.c_string, outputPath C.c_string) *C.char {
+	errMsg := tunnel.DumpRuleProviderToText(C.GoString(name), C.GoString(outputPath))
+	if errMsg == "" {
+		return nil
+	}
+	return C.CString(errMsg)
+}
+
 //export updateProvider
 func updateProvider(completable unsafe.Pointer, pType C.c_string, name C.c_string) {
 	go func(pType, name string) {

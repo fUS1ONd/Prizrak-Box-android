@@ -14,6 +14,7 @@ class ProvidersDesign(
     providers: List<Provider>,
 ) : Design<ProvidersDesign.Request>(context) {
     sealed class Request {
+        data class Open(val index: Int, val provider: Provider) : Request()
         data class Update(val index: Int, val provider: Provider) : Request()
     }
 
@@ -23,9 +24,13 @@ class ProvidersDesign(
     override val root: View
         get() = binding.root
 
-    private val adapter = ProviderAdapter(context, providers) { index, provider ->
-        requests.trySend(Request.Update(index, provider))
-    }
+    private val adapter = ProviderAdapter(
+        context,
+        providers,
+        onClick = { index, provider ->
+            requests.trySend(Request.Open(index, provider))
+        },
+    )
 
     fun updateElapsed() {
         adapter.updateElapsed()
@@ -53,9 +58,9 @@ class ProvidersDesign(
     }
 
     fun requestUpdateAll() {
-        adapter.states.filter { !it.updating }.forEachIndexed { index, state ->
-            state.updating = true
-            if (state.provider.vehicleType != Provider.VehicleType.Inline) {
+        adapter.states.forEachIndexed { index, state ->
+            if (state.provider.vehicleType != Provider.VehicleType.Inline && !state.updating) {
+                state.updating = true
                 requests.trySend(Request.Update(index, state.provider))
             }
         }

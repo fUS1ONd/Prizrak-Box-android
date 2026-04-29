@@ -26,10 +26,8 @@ class ProvidersActivity : BaseActivity<ProvidersDesign>() {
                     when (it) {
                         Event.ProfileLoaded -> {
                             val newList = withClash { queryProviders().sorted() }
-
                             if (newList != providers) {
                                 startActivity(ProvidersActivity::class.intent)
-
                                 finish()
                             }
                         }
@@ -38,13 +36,19 @@ class ProvidersActivity : BaseActivity<ProvidersDesign>() {
                 }
                 design.requests.onReceive {
                     when (it) {
+                        is ProvidersDesign.Request.Open -> {
+                            startActivity(
+                                ProviderDetailActivity::class.intent.putExtra(
+                                    ProviderDetailActivity.EXTRA_PROVIDER, it.provider
+                                )
+                            )
+                        }
                         is ProvidersDesign.Request.Update -> {
                             launch {
                                 try {
                                     withClash {
                                         updateProvider(it.provider.type, it.provider.name)
                                     }
-
                                     design.notifyChanged(it.index)
                                 } catch (e: Exception) {
                                     design.showExceptionToast(
@@ -54,7 +58,6 @@ class ProvidersActivity : BaseActivity<ProvidersDesign>() {
                                             e.message
                                         )
                                     )
-
                                     design.notifyUpdated(it.index)
                                 }
                             }
