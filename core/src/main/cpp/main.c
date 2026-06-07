@@ -367,6 +367,37 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeSubscribeLogcat(JNIEnv *env
     subscribeLogcat(_callback);
 }
 
+JNIEXPORT jboolean JNICALL
+Java_com_github_kr328_clash_core_bridge_Bridge_nativeVerifySecretKeys(JNIEnv *env, jobject thiz,
+                                                                      jstring keys) {
+    TRACE_METHOD();
+
+    scoped_string _keys = get_string(keys);
+
+    return (jboolean) verifySecretKeys(_keys);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_github_kr328_clash_core_bridge_Bridge_nativeGenerateAgeKeyPair(JNIEnv *env, jobject thiz) {
+    TRACE_METHOD();
+
+    scoped_string response = generateAgeKeyPair();
+
+    return new_string(response);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_github_kr328_clash_core_bridge_Bridge_nativeGenerateAgeKeyPairWithType(JNIEnv *env, jobject thiz,
+                                                                                jstring key_type) {
+    TRACE_METHOD();
+
+    scoped_string _key_type = get_string(key_type);
+
+    scoped_string response = generateAgeKeyPairWithType(_key_type);
+
+    return new_string(response);
+}
+
 
 static jmethodID m_tun_interface_mark_socket;
 static jmethodID m_tun_interface_query_socket_uid;
