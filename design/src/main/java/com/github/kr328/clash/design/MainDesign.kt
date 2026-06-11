@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
@@ -43,7 +44,6 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.coordinatorlayout.widget.CoordinatorLayout
-import androidx.databinding.OnRebindCallback
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -78,6 +78,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         UrlTest,
         OpenConnections,
         OpenModeSelector,
+        UrlTestSimpleMode,
     }
 
     private val binding = DesignMainBinding
@@ -107,11 +108,15 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
     } else null
 
     private val rootView: View = if (useDrawerNav) {
-        // Drawer layout: hide bottom nav and FAB — drawer provides navigation and toggle
+        // Drawer layout: hide bottom nav and FABs — drawer provides navigation and toggle.
+        // The FAB visibility bindings also guard on useDrawerNav so they never re-appear.
+        binding.useDrawerNav = true
         binding.bottomNav.visibility = View.GONE
-        binding.disconnectFab.visibility = View.GONE
         tvDrawer!!.wrapContent(binding.root)
     } else {
+        // Phone: wire latency test FAB click
+        binding.useDrawerNav = false
+        binding.latencyTestFab.setOnClickListener { requests.trySend(Request.UrlTestSimpleMode) }
         binding.root
     }
 
@@ -138,6 +143,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
     var pendingUpdateTag: String? = null
     var pendingUpdateUrl: String? = null
 
+    private var profileSimpleMode: Boolean = false
     private var latestProxyGroups: Map<String, ProxyGroup> = emptyMap()
     private var latestUseDots: Boolean = true
     private var openedProxyGroupName: String? = null
@@ -210,6 +216,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         withContext(Dispatchers.Main) {
             binding.hasProfiles = has
             binding.isLoading = false
+            tvDrawer?.hasProfiles = has
         }
     }
 
@@ -260,6 +267,9 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 binding.profileGlobalModeMp = profile.globalModeMp
                 binding.profileConnsViewMp = profile.connsViewMp
                 binding.profileRpMp = profile.rpMp
+                binding.profileSimpleMode = profile.simpleMode
+                profileSimpleMode = profile.simpleMode
+                tvDrawer?.isSimpleMode = profile.simpleMode
 
                 // Wire click listeners for shortcut icons
                 binding.btnModeSelector?.setOnClickListener { requests.trySend(Request.OpenModeSelector) }
@@ -311,6 +321,9 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 binding.profileGlobalModeMp = false
                 binding.profileConnsViewMp = false
                 binding.profileRpMp = false
+                binding.profileSimpleMode = false
+                profileSimpleMode = false
+                tvDrawer?.isSimpleMode = false
                 // Reset logo and title to defaults
                 binding.appLogo.setImageResource(R.drawable.ic_clash)
                 binding.appLogo.imageTintList = null
@@ -378,6 +391,16 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         }
     }
 
+    /** Small indeterminate spinner shown in place of a delay badge while a test is pending. */
+    private fun createDelaySpinner(dp: Float): View {
+        return android.widget.ProgressBar(context).apply {
+            isIndeterminate = true
+            layoutParams = LinearLayout.LayoutParams((16 * dp).toInt(), (16 * dp).toInt()).apply {
+                marginStart = (4 * dp).toInt()
+            }
+        }
+    }
+
     private fun createDelayText(dp: Float, delay: Int, useDots: Boolean): View {
         if (useDots) return createDelayDot(dp, delay)
         return TextView(context).apply {
@@ -427,6 +450,171 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         }
     }
 
+    suspend fun setLatencyTestRunning(running: Boolean) {
+        withContext(Dispatchers.Main) {
+            binding.latencyTestFab.isEnabled = !running
+            binding.latencyTestFab.alpha = if (running) 0.5f else 1f
+            tvDrawer?.isLatencyTesting = running
+        }
+    }
+
+    private fun renderSimpleModeGroup(
+        pair: Pair<String, ProxyGroup>,
+        container: LinearLayout,
+    ) {
+        val (_, group) = pair
+        val dp = context.resources.displayMetrics.density
+        val isDarkTheme =
+            (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val surfaceVariantColor = context.resolveThemedColor(com.google.android.material.R.attr.colorSurfaceVariant)
+        val surfaceColor = context.resolveThemedColor(com.google.android.material.R.attr.colorSurface)
+        val onSurfaceColor = context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
+        val onSurfaceVariantColor = context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val primaryColor = context.resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
+        val isSelector = group.type == "Selector"
+        val awaitingDelays = group.proxies.none { it.delay > 0 }
+
+        // Save which proxy row has D-pad focus so we can restore it after the view rebuild.
+        // Row views are tagged with the proxy name string.
+        val focusedProxyName: String? = run {
+            var v: View? = container.findFocus() ?: return@run null
+            while (v != null) {
+                val t = v.tag
+                if (t is String) return@run t
+                v = v.parent as? View
+            }
+            null
+        }
+
+        val card = MaterialCardView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = (8 * dp).toInt() }
+            radius = 16 * dp
+            cardElevation = if (isDarkTheme) 0f else 2 * dp
+            setCardBackgroundColor(if (isDarkTheme) surfaceVariantColor else surfaceColor)
+            isFocusable = false
+            isClickable = false
+        }
+
+        val innerLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        var focusTargetView: View? = null
+
+        group.proxies.forEachIndexed { index, proxy ->
+            val isSelected = proxy.name == group.now
+
+            if (index > 0) {
+                innerLayout.addView(View(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        (1 * dp).toInt(),
+                    ).apply {
+                        marginStart = (16 * dp).toInt()
+                        marginEnd = (16 * dp).toInt()
+                    }
+                    setBackgroundColor(onSurfaceVariantColor and 0x00FFFFFF or 0x1A000000)
+                })
+            }
+
+            // All rows are focusable for D-pad navigation.
+            // The focus ring is drawn via a StateListDrawable; click only fires for Selector groups.
+            val rowBg = StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 8 * dp
+                    setColor(0x00000000)
+                    setStroke((2 * dp).toInt(), primaryColor)
+                })
+                if (isSelector) {
+                    addState(intArrayOf(android.R.attr.state_pressed), GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = 8 * dp
+                        setColor(primaryColor and 0x00FFFFFF or 0x1A000000)
+                    })
+                }
+                addState(intArrayOf(), GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 8 * dp
+                    setColor(0x00000000)
+                })
+            }
+
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding((16 * dp).toInt(), (14 * dp).toInt(), (16 * dp).toInt(), (14 * dp).toInt())
+                isFocusable = true
+                isClickable = isSelector
+                tag = proxy.name
+                background = rowBg
+                if (isSelector) {
+                    setOnClickListener {
+                        pendingSelectGroup = pair.first
+                        pendingSelectName = proxy.name
+                        requests.trySend(Request.SelectProxy)
+                    }
+                }
+            }
+
+            if (proxy.name == focusedProxyName) focusTargetView = row
+
+            // Node name
+            val nameView = TextView(context).apply {
+                text = proxy.title.ifEmpty { proxy.name }
+                setTextColor(if (isSelected) primaryColor else onSurfaceColor)
+                textSize = 14f
+                if (isSelected) setTypeface(typeface, android.graphics.Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            row.addView(nameView)
+
+            // Checkmark for selected proxy (left of delay badge)
+            if (isSelected) {
+                row.addView(ImageView(context).apply {
+                    layoutParams = LinearLayout.LayoutParams((20 * dp).toInt(), (20 * dp).toInt()).apply {
+                        marginStart = (8 * dp).toInt()
+                        marginEnd = (8 * dp).toInt()
+                    }
+                    setImageResource(R.drawable.ic_baseline_check)
+                    imageTintList = ColorStateList.valueOf(primaryColor)
+                })
+            }
+
+            // Delay badge, or a loading spinner while results are pending
+            if (awaitingDelays) {
+                row.addView(createDelaySpinner(dp))
+            } else {
+                row.addView(createDelayText(dp, proxy.delay, latestUseDots))
+            }
+
+            innerLayout.addView(row)
+        }
+
+        card.addView(innerLayout)
+
+        // Swap the container contents. Suppress the drawer's focus-redirect logic during the swap
+        // so that removeAllViews() detaching the focused view doesn't cause focus to jump elsewhere.
+        val doSwap = {
+            container.removeAllViews()
+            container.gravity = Gravity.TOP
+            container.addView(card)
+        }
+        if (tvDrawer != null) {
+            tvDrawer.withSuppressedFocusRedirect(doSwap)
+        } else {
+            doSwap()
+        }
+
+        // Restore D-pad focus to the previously focused row
+        focusTargetView?.requestFocus()
+    }
+
     private fun resolveDelay(
         groupMap: Map<String, ProxyGroup>,
         groupName: String,
@@ -436,9 +624,9 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         if (!visited.add(groupName)) return 0
         val currentGroup = groupMap[groupName] ?: return 0
         val selected = currentGroup.proxies.find { it.name == now } ?: return 0
-        if (!selected.type.group) return selected.delay
+        if (!selected.isGroup) return selected.delay
         val nestedGroup = groupMap[selected.name] ?: return selected.delay
-        if (nestedGroup.type == com.github.kr328.clash.core.model.Proxy.Type.LoadBalance) {
+        if (nestedGroup.type == "LoadBalance") {
             return nestedGroup.proxies.filter { it.delay in 1..65534 }
                 .minOfOrNull { it.delay } ?: 0
         }
@@ -456,7 +644,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
 
         val selectedDisplayName = selected.title.ifEmpty { selected.name }
 
-        if (!selected.type.group) {
+        if (!selected.isGroup) {
             return selectedDisplayName to selected.delay
         }
 
@@ -531,8 +719,8 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         proxyDelayUpdaters.clear()
         lastOpenedGroupNow = group.now
 
-        val isSelectorGroup = group.type == com.github.kr328.clash.core.model.Proxy.Type.Selector
-        val isSmartGroup = group.type == com.github.kr328.clash.core.model.Proxy.Type.Smart
+        val isSelectorGroup = group.type == "Selector"
+        val isSmartGroup = group.type == "Smart"
 
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -604,10 +792,10 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
             fun buildProxyRow(proxy: com.github.kr328.clash.core.model.Proxy): View {
                 val isSelected = proxy.name == group.now
                 val proxyDisplayName = proxy.title.ifEmpty { proxy.name }
-                val proxyDelay = if (proxy.type.group) {
+                val proxyDelay = if (proxy.isGroup) {
                     val nestedGroup = groupMap[proxy.name]
                     if (nestedGroup != null) {
-                        if (proxy.type == com.github.kr328.clash.core.model.Proxy.Type.LoadBalance) {
+                        if (proxy.type == "LoadBalance") {
                             nestedGroup.proxies.filter { it.delay in 1..65534 }
                                 .minOfOrNull { it.delay } ?: 0
                         } else {
@@ -621,7 +809,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 }
 
                 val nestedSmartGroup62 =
-                    if (!isSmartGroup && proxy.type == com.github.kr328.clash.core.model.Proxy.Type.Smart)
+                    if (!isSmartGroup && proxy.type == "Smart")
                         groupMap[proxy.name] else null
                 val hasSmartData62 = nestedSmartGroup62?.proxies?.any { it.rank.isNotEmpty() && it.weight > 0.0 } == true
 
@@ -730,7 +918,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 }
 
                 val subtitleView = TextView(context).apply {
-                    text = proxy.subtitle.ifEmpty { proxy.type.name }
+                    text = proxy.subtitle.ifEmpty { proxy.type }
                     textSize = 12f
                     setTextColor(if (isSelected) onSecondaryContainerColor else onSurfaceVariantColor)
                     alpha = if (isSelected) 0.85f else 1f
@@ -805,10 +993,10 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                     val updatedProxy = latestProxyGroups[groupName]?.proxies?.find { p -> p.name == proxy.name }
                     val newDelay: Int = when {
                         updatedProxy == null -> 0
-                        updatedProxy.type.group -> {
+                        updatedProxy.isGroup -> {
                             val nested = latestProxyGroups[updatedProxy.name]
                             if (nested != null) {
-                                if (updatedProxy.type == com.github.kr328.clash.core.model.Proxy.Type.LoadBalance)
+                                if (updatedProxy.type == "LoadBalance")
                                     nested.proxies.filter { it.delay in 1..65534 }.minOfOrNull { it.delay } ?: 0
                                 else
                                     resolveDelay(latestProxyGroups, updatedProxy.name, nested.now)
@@ -1026,6 +1214,15 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
 
             val visibleGroups = groups.filter { !it.second.hidden }
             val groupMap = visibleGroups.toMap()
+
+            // Simple mode: show nodes of the first group inline, skip group cards
+            if (profileSimpleMode && visibleGroups.isNotEmpty()) {
+                latestProxyGroups = groupMap
+                latestUseDots = useDots
+                groupInfoViews.clear()
+                renderSimpleModeGroup(visibleGroups.first(), container)
+                return@withContext
+            }
 
             // In-place update: if the set and order of groups is unchanged, only update
             // the subtitle text (selected proxy name + delay) without rebuilding any views.
@@ -1381,16 +1578,10 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         binding.hasTrafficInfo = false
         binding.hasExpireInfo = false
 
-        // Drawer layout (TV or tablet/foldable landscape): D-pad focus + hide FAB on rebind
+        // Drawer layout (TV or tablet/foldable landscape): D-pad focus.
+        // FAB visibility is guarded by the useDrawerNav binding flag, so no rebind hook is needed.
         if (useDrawerNav) {
             (binding.profileCard as? ViewGroup)?.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-
-            // Prevent data binding from re-showing the FAB after rebind
-            binding.addOnRebindCallback(object : OnRebindCallback<DesignMainBinding>() {
-                override fun onBound(binding: DesignMainBinding?) {
-                    binding?.disconnectFab?.visibility = View.GONE
-                }
-            })
         }
 
         if (!useDrawerNav) {
@@ -1405,14 +1596,14 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 }
             }
 
-            // Position disconnect FAB above bottom nav dynamically after layout
+            // Position the FAB row above bottom nav dynamically after layout
             binding.bottomNav.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
                 override fun onGlobalLayout() {
                     binding.bottomNav.viewTreeObserver.removeOnGlobalLayoutListener(this)
                     val dp = context.resources.displayMetrics.density
-                    val params = binding.disconnectFab.layoutParams as CoordinatorLayout.LayoutParams
+                    val params = binding.fabRow.layoutParams as CoordinatorLayout.LayoutParams
                     params.bottomMargin = binding.bottomNav.height + (12 * dp).toInt()
-                    binding.disconnectFab.layoutParams = params
+                    binding.fabRow.layoutParams = params
                 }
             })
         }
