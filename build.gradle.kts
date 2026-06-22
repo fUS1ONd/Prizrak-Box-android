@@ -15,6 +15,7 @@ buildscript {
         classpath(libs.build.android)
         classpath(libs.build.kotlin.common)
         classpath(libs.build.kotlin.serialization)
+        classpath(libs.build.kotlin.compose)
         classpath(libs.build.ksp)
         classpath(libs.build.golang)
     }
@@ -45,9 +46,21 @@ subprojects {
     extensions.configure<BaseExtension> {
         buildFeatures.buildConfig = true
         defaultConfig {
+            // Moshen core version, read from go.mod at build time (the
+            // `replace ... => github.com/legiz-ru/moshen vX.Y.Z` line).
+            val moshenCoreVersion = rootProject.file("core/src/main/golang/go.mod")
+                .takeIf { it.exists() }?.readText()
+                ?.let { Regex("""legiz-ru/moshen\s+(v[\w.\-]+)""").find(it)?.groupValues?.get(1) }
+                ?: "unknown"
+            buildConfigField("String", "CORE_VERSION", "\"$moshenCoreVersion\"")
+
             if (isApp) {
                 val customApplicationId = queryConfigProperty("custom.application.id") as? String?
                 applicationId = customApplicationId.takeIf { it?.isNotBlank() == true } ?: "ru.legiz.prizrakbox"
+
+                // Ship only Russian, English and (Simplified) Chinese; strips
+                // every other locale pulled in by AndroidX/Material libraries.
+                resourceConfigurations += listOf("en", "ru", "zh")
             }
 
             project.name.let { name ->
@@ -171,12 +184,6 @@ subprojects {
             }
             named("debug") {
                 versionNameSuffix = ".debug"
-            }
-        }
-
-        buildFeatures.apply {
-            dataBinding {
-                isEnabled = name != "hideapi"
             }
         }
 
