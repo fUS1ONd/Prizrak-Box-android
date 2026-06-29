@@ -35,6 +35,20 @@ object ProfileProcessor {
     class HwidNotSupportedException : IOException("HWID_NOT_SUPPORTED")
     class HwidMaxDevicesReachedException(val supportUrl: String = "") : IOException("HWID_MAX_DEVICES_REACHED")
 
+    /** Thrown when a fetched config is age-encrypted but the profile has no age-secret-key set. */
+    class AgeKeyRequiredException : IOException("AGE_KEY_REQUIRED")
+
+    /**
+     * Detects whether [content] is an age-encrypted payload (ASCII-armored or binary header).
+     * Such configs can only be parsed by the core when a matching age-secret-key is present
+     * (written to age-secret-key.txt alongside config.yaml).
+     */
+    fun isAgeEncrypted(content: String): Boolean {
+        val trimmed = content.trimStart()
+        return trimmed.startsWith("-----BEGIN AGE ENCRYPTED FILE-----") ||
+            trimmed.startsWith("age-encryption.org/v1")
+    }
+
     private fun isHeaderTrue(headers: okhttp3.Headers, name: String): Boolean {
         return headers[name]?.trim()?.equals("true", ignoreCase = true) == true
     }
@@ -683,6 +697,10 @@ object ProfileProcessor {
                 if (snapshot.type == Profile.Type.Converted) {
                     val pendingDir = context.pendingDir.resolve(snapshot.uuid.toString())
                     val fetchResult = fetchSourceContentWithPxa(context, downloadUrl ?: snapshot.source)
+                    // Encrypted source without a key cannot be converted — surface a clear warning.
+                    if (isAgeEncrypted(fetchResult.content) && snapshot.ageSecretKey.isEmpty()) {
+                        throw AgeKeyRequiredException()
+                    }
                     if (fetchResult.headersAvailable) {
                         TemplateManager.savePxaMeta(
                             pendingDir,
@@ -735,6 +753,11 @@ object ProfileProcessor {
 
                     if (localConfig.exists()) {
                         val content = localConfig.readText(Charsets.UTF_8)
+                        // Age-encrypted config but no key set: the core can't decrypt it.
+                        // Throw a typed error so the import UI can prompt for an age-secret-key.
+                        if (isAgeEncrypted(content) && snapshot.ageSecretKey.isEmpty()) {
+                            throw AgeKeyRequiredException()
+                        }
                         if (detectContentFormat(content) == ContentFormat.ConvertibleContent) {
                             val pendingDir = context.pendingDir.resolve(snapshot.uuid.toString())
 
@@ -779,6 +802,11 @@ object ProfileProcessor {
                     context.processingDir.resolve("age-secret-key.txt")
                         .writeText(snapshot.ageSecretKey)
                 }
+
+                // Install the age secret key into the core so it can decrypt an
+                // age-encrypted config during fetchAndValid (the core reads identities
+                // only from this global, not from age-secret-key.txt). Empty clears it.
+                Clash.setAgeSecretKeys(snapshot.ageSecretKey)
 
                 val fetchTarget = resolveFetchTarget(
                     context, snapshot.type, snapshot.source, alreadyPrefetched
@@ -986,6 +1014,10 @@ object ProfileProcessor {
                     }
                 }
 
+                // Install the age secret key so an age-encrypted config can be
+                // decrypted by the core during this refresh; empty clears it.
+                Clash.setAgeSecretKeys(snapshot.ageSecretKey)
+
                 val fetchTarget = resolveFetchTarget(
                     context, snapshot.type, snapshot.source, downloadUrlOverride = downloadUrl
                 )
@@ -1126,9 +1158,16 @@ object ProfileProcessor {
             }
             headers["announce"]?.let { if (it.isNotBlank()) json.put("announce", decodeHeaderValue(it)) }
             if (isHeaderTrue(headers, "x-hwid-active")) json.put("x_hwid_active", true)
-            headers["pxa-latency-dots"]?.trim()?.toIntOrNull()?.let {
-                if (it == 0 || it == 1) json.put("pxa_latency_dots", it)
-            }
+            // pxa-latency-dots (0 = numeric ms, 1 = colored dots). For Happ-compatibility
+            // the `ping-result` alias is also accepted: time => 0, icon => 1.
+            // The native pxa-latency-dots header takes precedence when both are present.
+            val latencyDots = headers["pxa-latency-dots"]?.trim()?.toIntOrNull()?.takeIf { it == 0 || it == 1 }
+                ?: when (headers["ping-result"]?.trim()?.lowercase()) {
+                    "time" -> 0
+                    "icon" -> 1
+                    else -> null
+                }
+            if (latencyDots != null) json.put("pxa_latency_dots", latencyDots)
             if (headers["pxa-global-mode-mp"]?.trim() == "1") json.put("pxa_global_mode_mp", true)
             if (headers["pxa-conns-view-mp"]?.trim() == "1") json.put("pxa_conns_view_mp", true)
             if (headers["pxa-rp-mp"]?.trim() == "1") json.put("pxa_rp_mp", true)
@@ -1177,8 +1216,9 @@ object ProfileProcessor {
         return withContext(Dispatchers.IO) {
             try {
                 val client = OkHttpClient.Builder()
-                    .connectTimeout(10, TimeUnit.SECONDS)
-                    .readTimeout(10, TimeUnit.SECONDS)
+                    .connectTimeout(3, TimeUnit.SECONDS)
+                    .readTimeout(3, TimeUnit.SECONDS)
+                    .callTimeout(3, TimeUnit.SECONDS)
                     .build()
                 val baseRequest = buildProfileRequest(context, url)
 

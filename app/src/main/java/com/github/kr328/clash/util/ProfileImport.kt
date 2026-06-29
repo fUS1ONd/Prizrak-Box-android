@@ -8,6 +8,7 @@ import com.github.kr328.clash.MainActivity
 import com.github.kr328.clash.PropertiesActivity
 import com.github.kr328.clash.common.util.intent
 import com.github.kr328.clash.common.util.setUUID
+import com.github.kr328.clash.design.dialog.applyFetchStatus
 import com.github.kr328.clash.design.dialog.withModelProgressBar
 import com.github.kr328.clash.service.ProfileProcessor
 import com.github.kr328.clash.service.TemplateManager
@@ -15,6 +16,8 @@ import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.service.util.pendingDir
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -59,6 +62,36 @@ private suspend fun Context.showHwidNotSupportedImportDialog() {
                 .setTitle(com.github.kr328.clash.design.R.string.hwid_not_supported_title)
                 .setMessage(com.github.kr328.clash.design.R.string.hwid_not_supported_msg)
                 .setPositiveButton(com.github.kr328.clash.design.R.string.ok) { _, _ ->
+                    if (cont.isActive) cont.resume(Unit)
+                }
+                .setOnCancelListener { if (cont.isActive) cont.resume(Unit) }
+                .show()
+            cont.invokeOnCancellation { dialog.dismiss() }
+        }
+    }
+}
+
+private fun isAgeKeyRequiredImport(exception: Throwable): Boolean {
+    var current: Throwable? = exception
+    while (current != null) {
+        if (current is ProfileProcessor.AgeKeyRequiredException) return true
+        if (current.message.orEmpty().contains("AGE_KEY_REQUIRED", ignoreCase = true)) return true
+        current = current.cause
+    }
+    return false
+}
+
+private suspend fun Context.showAgeKeyRequiredImportDialog(uuid: UUID) {
+    withContext(Dispatchers.Main) {
+        suspendCancellableCoroutine<Unit> { cont ->
+            val dialog = MaterialAlertDialogBuilder(this@showAgeKeyRequiredImportDialog)
+                .setTitle(com.github.kr328.clash.design.R.string.age_key_required_title)
+                .setMessage(com.github.kr328.clash.design.R.string.age_key_required_msg)
+                .setPositiveButton(com.github.kr328.clash.design.R.string.age_key_required_set) { _, _ ->
+                    if (cont.isActive) cont.resume(Unit)
+                    startActivity(PropertiesActivity::class.intent.setUUID(uuid))
+                }
+                .setNegativeButton(com.github.kr328.clash.design.R.string.cancel) { _, _ ->
                     if (cont.isActive) cont.resume(Unit)
                 }
                 .setOnCancelListener { if (cont.isActive) cont.resume(Unit) }
@@ -115,8 +148,15 @@ private fun isDirectProxyLinks(input: String): Boolean {
  *    - If [forceAutoImport] is true (deeplink flow), auto-imports even without headers.
  *    - During commit, [ProfileProcessor] will auto-detect convertible content (proxy links,
  *      base64-encoded proxy-link lists) and transparently switch the stored type to Converted.
+ *
+ * [ageSecretKey] (optional) is stored on the profile so an age-encrypted config can be
+ * decrypted during commit/load (used by the TV transfer flow to carry the sender's key).
  */
-suspend fun Context.importProfileFromUrl(url: String, forceAutoImport: Boolean = false): ProfileImportResult {
+suspend fun Context.importProfileFromUrl(
+    url: String,
+    forceAutoImport: Boolean = false,
+    ageSecretKey: String = "",
+): ProfileImportResult {
     // Direct proxy links — bypass HTTP fetch entirely.
     if (isDirectProxyLinks(url)) {
         return importDirectProxyLinks(url)
@@ -140,7 +180,7 @@ suspend fun Context.importProfileFromUrl(url: String, forceAutoImport: Boolean =
 
     val uuid = withProfile {
         create(Profile.Type.Url, name).also {
-            patch(it, name, url, intervalMs)
+            patch(it, name, url, intervalMs, ageSecretKey)
         }
     }
 
@@ -151,6 +191,7 @@ suspend fun Context.importProfileFromUrl(url: String, forceAutoImport: Boolean =
         var hwidIssue = HwidIssue.None
         var hwidSupportUrl = ""
         var committed = false
+        var ageKeyRequired = false
 
         withModelProgressBar {
             configure {
@@ -159,10 +200,20 @@ suspend fun Context.importProfileFromUrl(url: String, forceAutoImport: Boolean =
             }
 
             try {
-                withProfile { commit(uuid, null) }
+                withProfile {
+                    coroutineScope {
+                        commit(uuid) { status ->
+                            launch { configure { applyFetchStatus(this@importProfileFromUrl, status) } }
+                        }
+                    }
+                }
                 withProfile { queryByUUID(uuid)?.let { setActive(it) } }
                 committed = true
             } catch (e: Exception) {
+                if (isAgeKeyRequiredImport(e)) {
+                    ageKeyRequired = true
+                    return@withModelProgressBar
+                }
                 val (issue, supportUrl) = resolveHwidImportIssue(e)
                 hwidIssue = issue
                 hwidSupportUrl = supportUrl
@@ -178,7 +229,9 @@ suspend fun Context.importProfileFromUrl(url: String, forceAutoImport: Boolean =
             }
         }
 
-        when (hwidIssue) {
+        if (ageKeyRequired) {
+            showAgeKeyRequiredImportDialog(uuid)
+        } else when (hwidIssue) {
             HwidIssue.NotSupported -> showHwidNotSupportedImportDialog()
             HwidIssue.MaxDevicesReached -> showHwidMaxDevicesImportDialog(hwidSupportUrl)
             HwidIssue.None -> if (committed) {
@@ -222,7 +275,13 @@ private suspend fun Context.importDirectProxyLinks(proxyLinks: String): ProfileI
         }
 
         try {
-            withProfile { commit(uuid, null) }
+            withProfile {
+                coroutineScope {
+                    commit(uuid) { status ->
+                        launch { configure { applyFetchStatus(this@importDirectProxyLinks, status) } }
+                    }
+                }
+            }
             withProfile { queryByUUID(uuid)?.let { setActive(it) } }
         } catch (_: Exception) {
             Toast.makeText(

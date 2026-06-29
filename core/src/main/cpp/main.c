@@ -377,6 +377,29 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeVerifySecretKeys(JNIEnv *en
     return (jboolean) verifySecretKeys(_keys);
 }
 
+JNIEXPORT void JNICALL
+Java_com_github_kr328_clash_core_bridge_Bridge_nativeSetAgeSecretKeys(JNIEnv *env, jobject thiz,
+                                                                      jstring keys) {
+    TRACE_METHOD();
+
+    scoped_string _keys = get_string(keys);
+
+    setAgeSecretKeys(_keys);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_github_kr328_clash_core_bridge_Bridge_nativeDecryptConfig(JNIEnv *env, jobject thiz,
+                                                                   jstring content, jstring keys) {
+    TRACE_METHOD();
+
+    scoped_string _content = get_string(content);
+    scoped_string _keys = get_string(keys);
+
+    scoped_string response = decryptConfig(_content, _keys);
+
+    return new_string(response);
+}
+
 JNIEXPORT jstring JNICALL
 Java_com_github_kr328_clash_core_bridge_Bridge_nativeGenerateAgeKeyPair(JNIEnv *env, jobject thiz) {
     TRACE_METHOD();

@@ -1,11 +1,13 @@
 package com.github.kr328.clash.util
 
 import android.app.Activity
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import com.github.kr328.clash.design.R
 import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.service.util.importedDir
+import com.github.kr328.clash.tv.TvCrypto
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -28,11 +30,17 @@ suspend fun Activity.sendProfileToTv(tvUrl: String) {
         return
     }
 
-    val hostPort = try {
-        val u = URL(tvUrl)
-        "${u.host}:${u.port}"
-    } catch (_: Exception) {
-        tvUrl
+    // Parse the QR URL once. Strip any query (?v=1&t=..&k=..) to derive the base address.
+    val uri = Uri.parse(tvUrl)
+    val baseUrl = "${uri.scheme}://${uri.host}:${uri.port}"
+    val hostPort = "${uri.host}:${uri.port}"
+
+    // Ping the TV import server first: if its import window isn't open (or the device is
+    // unreachable), tell the user up front instead of letting them pick a profile and only
+    // failing on send.
+    if (!pingTv(baseUrl)) {
+        Toast.makeText(this, getString(R.string.tv_send_not_open), Toast.LENGTH_LONG).show()
+        return
     }
 
     val displayItems = profiles.map { p ->
@@ -71,15 +79,18 @@ suspend fun Activity.sendProfileToTv(tvUrl: String) {
 
     val profile = profiles[pendingSelection]
 
-    // Resolve the /submit endpoint – same one the browser web page uses
-    val baseUrl = tvUrl.trimEnd('/').removeSuffix("/Prizrak-BoxTVimport")
-    val submitUrl = "$baseUrl/Prizrak-BoxTVimport/submit"
+    // Use the richer /api/transfer endpoint (typed url/yaml + name + optional
+    // age-secret-key). The browser web page keeps using /submit (untouched).
+    val transferUrl = "$baseUrl/Prizrak-BoxTVimport/api/transfer"
 
-    // Content to send: subscription URL for Url/Converted/External,
-    // raw YAML for File profiles (mirrors what a user would paste in the browser)
-    val content: String = when (profile.type) {
+    // Secrets carried in the QR: token (auth) + AES-256-GCM key (payload encryption).
+    val token = uri.getQueryParameter("t")
+    val keyB64 = uri.getQueryParameter("k")
+
+    // Subscription URL for Url/Converted/External; raw YAML for File profiles.
+    val (transferType, contentValue) = when (profile.type) {
         Profile.Type.Url, Profile.Type.Converted, Profile.Type.External ->
-            profile.source
+            "url" to profile.source
 
         Profile.Type.File -> {
             val yaml = withContext(Dispatchers.IO) {
@@ -91,24 +102,40 @@ suspend fun Activity.sendProfileToTv(tvUrl: String) {
                 Toast.makeText(this, getString(R.string.tv_send_error), Toast.LENGTH_LONG).show()
                 return
             }
-            yaml
+            "yaml" to yaml
         }
     }
 
-    // {"content":"..."} – identical format to the browser web page POST
-    val jsonBody = """{"content":"${escapeJson(content)}"}"""
+    val contentField = if (transferType == "url") "url" else "content"
+    // Carry the profile's age-secret-key so an encrypted config decrypts on the TV.
+    val keyJson = if (profile.ageSecretKey.isNotEmpty())
+        ""","age-secret-key":"${escapeJson(profile.ageSecretKey)}""""
+    else ""
+    val jsonBody =
+        """{"type":"$transferType","$contentField":"${escapeJson(contentValue)}","name":"${escapeJson(profile.name)}"$keyJson}"""
+
+    // Secured path: authenticate with the token and encrypt the payload with the QR key.
+    // Plain fallback when the QR has no token/key (older TV without the secured channel).
+    val secured = !token.isNullOrEmpty() && !keyB64.isNullOrEmpty()
+    val requestBody = if (secured) {
+        val enc = TvCrypto.encrypt(TvCrypto.decodeB64(keyB64!!), jsonBody)
+        """{"nonce":"${enc.nonce}","data":"${enc.data}"}"""
+    } else {
+        jsonBody
+    }
 
     var errorMsg: String? = null
     val success = withContext(Dispatchers.IO) {
         try {
-            Log.d("TvSender", "POST $submitUrl body=${jsonBody.length} chars")
-            val conn = URL(submitUrl).openConnection() as HttpURLConnection
+            Log.d("TvSender", "POST $transferUrl secured=$secured body=${requestBody.length} chars")
+            val conn = URL(transferUrl).openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            if (secured) conn.setRequestProperty("X-PXA-Token", token!!)
             conn.doOutput = true
             conn.connectTimeout = 5_000
             conn.readTimeout = 5_000
-            val bytes = jsonBody.toByteArray(Charsets.UTF_8)
+            val bytes = requestBody.toByteArray(Charsets.UTF_8)
             conn.setRequestProperty("Content-Length", bytes.size.toString())
             conn.outputStream.use { it.write(bytes) }
             val code = conn.responseCode
@@ -137,6 +164,26 @@ suspend fun Activity.sendProfileToTv(tvUrl: String) {
         else getString(R.string.tv_send_error)
     }
     Toast.makeText(this, toastText, Toast.LENGTH_LONG).show()
+}
+
+/**
+ * Quick reachability check: GET /Prizrak-BoxTVimport/api/ping with a short timeout.
+ * Returns true only when the TV import server answers with a 2xx, i.e. its import
+ * window is open and reachable on the LAN.
+ */
+private suspend fun pingTv(baseUrl: String): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val conn = URL("$baseUrl/Prizrak-BoxTVimport/api/ping").openConnection() as HttpURLConnection
+        conn.requestMethod = "GET"
+        conn.connectTimeout = 2_000
+        conn.readTimeout = 2_000
+        val code = conn.responseCode
+        conn.disconnect()
+        code in 200..299
+    } catch (e: Exception) {
+        Log.d("TvSender", "Ping failed: ${e.javaClass.simpleName}: ${e.message}")
+        false
+    }
 }
 
 private fun escapeJson(s: String): String = buildString {

@@ -79,16 +79,27 @@ class TvImportActivity : BaseActivity() {
             assets.open("tv_import_web.html").bufferedReader().readText()
         }
 
-        val tvServer = TvImportServer(port, html)
+        // One-time token (auth) + AES-256-GCM key (payload encryption) carried only in the
+        // QR code, so a LAN sniffer/MITM can't read or forge the phone → TV transfer.
+        val token = com.github.kr328.clash.tv.TvCrypto.encodeB64(
+            com.github.kr328.clash.tv.TvCrypto.randomBytes(16)
+        )
+        val keyBytes = com.github.kr328.clash.tv.TvCrypto.randomBytes(32)
+        val keyB64 = com.github.kr328.clash.tv.TvCrypto.encodeB64(keyBytes)
+
+        val tvServer = TvImportServer(port, html, token, keyBytes)
         server = tvServer
         tvServer.start(this)
 
-        val url = "http://$localIp:$port/Prizrak-BoxTVimport"
-        val qrBitmap = withContext(Dispatchers.Default) { generateQrCode(url, 512) }
+        val baseUrl = "http://$localIp:$port/Prizrak-BoxTVimport"
+        // QR carries the secrets (consumed by the phone app); the displayed URL stays clean
+        // for manual browser entry (the browser uses /submit and ignores the query).
+        val qrUrl = "$baseUrl?v=1&t=$token&k=$keyB64"
+        val qrBitmap = withContext(Dispatchers.Default) { generateQrCode(qrUrl, 512) }
 
         ipFlow.value = localIp
         portFlow.value = port.toString()
-        urlFlow.value = url
+        urlFlow.value = baseUrl
         qrFlow.value = qrBitmap
 
         // Wait for profile data – suspends until the server receives something
@@ -104,7 +115,11 @@ class TvImportActivity : BaseActivity() {
 
     private suspend fun processImport(data: TvImportServer.ImportData) {
         when (data.type) {
-            "url" -> importProfileFromUrl(data.content)
+            "url" -> importProfileFromUrl(
+                data.content,
+                forceAutoImport = true,
+                ageSecretKey = data.ageSecretKey.orEmpty(),
+            )
 
             "yaml" -> {
                 val name = data.name
@@ -114,7 +129,7 @@ class TvImportActivity : BaseActivity() {
                         .also { it.writeText(data.content) }
                 }
                 val uuid = withProfile { create(com.github.kr328.clash.service.model.Profile.Type.File, name) }
-                withProfile { patch(uuid, name, tmpFile.absolutePath, 0L) }
+                withProfile { patch(uuid, name, tmpFile.absolutePath, 0L, data.ageSecretKey.orEmpty()) }
                 try {
                     withProfile { commit(uuid, null) }
                     withProfile { queryByUUID(uuid)?.let { setActive(it) } }
