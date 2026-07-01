@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -67,9 +68,18 @@ fun ConnectionDetailSheet(
         val hasOther = meta.dnsMode.isNotEmpty() || meta.specialProxy.isNotEmpty() ||
             meta.specialRules.isNotEmpty() || meta.dscp > 0
 
+        // Fix the sheet to the full available height instead of letting it
+        // wrap its content. With skipPartiallyExpanded the Expanded anchor is
+        // the only open position; when the sheet wraps short content that
+        // anchor sits partway up the screen, leaving a gap above it. Dragging
+        // the handle up into that gap has no anchor to settle on, so the sheet
+        // oscillates against the top/status bar ("колбасит"). Filling the
+        // height makes Expanded coincide with the top limit, removing the gap;
+        // the content scrolls within the fixed-height container.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp),
