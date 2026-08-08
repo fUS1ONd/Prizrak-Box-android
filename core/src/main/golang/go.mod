@@ -10,7 +10,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-replace github.com/metacubex/mihomo => github.com/legiz-ru/moshen v1.19.29-smart-moshen
+replace github.com/metacubex/mihomo => github.com/fUS1ONd/moshen v1.19.29-fs.1
 
 replace google.golang.org/protobuf => github.com/metacubex/protobuf-go v0.0.0-20260306035419-7ceee0674686
 
