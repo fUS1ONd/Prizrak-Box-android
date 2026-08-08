@@ -10,6 +10,7 @@ import com.github.kr328.clash.design.compose.theme.ClashTheme
 import com.github.kr328.clash.design.compose.theme.ClashThemeVariant
 import com.github.kr328.clash.design.model.DarkMode
 import com.github.kr328.clash.update.UpdateChecker
+import com.github.kr328.clash.update.showUpdateAvailableDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -47,23 +48,12 @@ class HelpActivity : BaseActivity() {
     private suspend fun runUpdateCheck() {
         when (val result = UpdateChecker.check(this)) {
             is UpdateChecker.CheckResult.UpdateAvailable ->
-                showUpdateAvailableDialog(result.tagName, result.downloadUrl)
+                showUpdateAvailableDialog(result)
             is UpdateChecker.CheckResult.UpToDate ->
                 simpleDialog(R.string.update_not_found_title, getString(R.string.update_not_found_message))
             is UpdateChecker.CheckResult.Error ->
                 simpleDialog(R.string.update_error_title, result.message)
         }
-    }
-
-    private fun showUpdateAvailableDialog(tagName: String, downloadUrl: String) {
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.update_available_title)
-            .setMessage(getString(R.string.update_available_message, tagName))
-            .setPositiveButton(R.string.update_download) { _, _ ->
-                UpdateChecker.startDownload(this, downloadUrl, tagName)
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     private fun simpleDialog(titleRes: Int, message: String) {

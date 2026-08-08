@@ -121,6 +121,11 @@ subprojects {
 
                 buildConfigField("boolean", "PREMIUM", "Boolean.parseBoolean(\"false\")")
 
+                // Канал обновлений — свойство сборки, а не вывод из applicationId
+                // или имени версии: remove.suffix стирает оба суффикса, и такой
+                // вывод развалился бы молча.
+                buildConfigField("String", "UPDATE_CHANNEL", "\"alpha\"")
+
                 resValue("string", "launch_name", "@string/launch_name_alpha")
                 resValue("string", "application_name", "@string/application_name_alpha")
 
@@ -148,6 +153,9 @@ subprojects {
                 }
 
                 buildConfigField("boolean", "PREMIUM", "Boolean.parseBoolean(\"false\")")
+
+                // См. комментарий в alpha-флейворе: канал задаётся явно.
+                buildConfigField("String", "UPDATE_CHANNEL", "\"meta\"")
 
                 resValue("string", "launch_name", "@string/launch_name_meta")
                 resValue("string", "application_name", "@string/application_name_meta")

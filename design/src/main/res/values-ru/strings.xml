@@ -431,6 +431,12 @@
     <string name="update_not_found_title">Обновлений нет</string>
     <string name="update_not_found_message">У вас установлена последняя версия.</string>
     <string name="update_error_title">Ошибка проверки обновлений</string>
+    <string name="update_release_page">Страница релиза</string>
+    <string name="update_error_network">Не удалось связаться с сервером обновлений.</string>
+    <string name="update_error_malformed">Не удалось разобрать сведения о релизе.</string>
+    <string name="update_error_wrong_channel">Релиз не относится к каналу обновлений этой сборки.</string>
+    <string name="update_error_foreign_application">Сборка из релиза предназначена другому приложению.</string>
+    <string name="update_error_no_asset">В релизе нет сборки для вашего устройства.</string>
 
     <string name="shortcut_toggle_short">Вкл/выкл Clash</string>
     <string name="shortcut_toggle_long">Включить или выключить сервис Clash</string>
