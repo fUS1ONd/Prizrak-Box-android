@@ -9,6 +9,11 @@ on:
       - "docs/**"
       - ".github/ISSUE_TEMPLATE/**"
 
+# Публикация pre-release и релизов требует записи в contents: права по
+# умолчанию в репозитории — read, поэтому объявляем их явно здесь, как в ядре.
+permissions:
+  contents: write
+
 jobs:
   BuildPreRelease:
     runs-on: ubuntu-latest
@@ -81,6 +86,8 @@ jobs:
 
       # Delete old Prerelease-alpha
       - uses: dev-drprasad/delete-tag-and-release@v1.1
+        # на первом прогоне тега ещё нет — удалять нечего, это не ошибка
+        continue-on-error: true
         with:
           tag_name: Prerelease-alpha
           github_token: ${{ secrets.GITHUB_TOKEN }}
