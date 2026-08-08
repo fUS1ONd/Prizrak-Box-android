@@ -16,10 +16,31 @@ import kotlinx.serialization.json.longOrNull
  * установщика), живёт в [UpdateChecker]; здесь только разбор ответов и выбор.
  */
 
-/** Канал обновлений. Задаётся флейвором сборки, в приложении не переключается. */
-enum class UpdateChannel(val id: String) {
-    META("meta"),
-    ALPHA("alpha");
+/**
+ * Канал обновлений. Задаётся флейвором сборки, в приложении не переключается.
+ *
+ * Всё, чем каналы отличаются, собрано здесь: третий флейвор упрётся в отсутствие
+ * своей ветки в одном месте, а не в трёх разных.
+ */
+enum class UpdateChannel(
+    val id: String,
+    /**
+     * Интервал фоновой проверки. У alpha он длиннее: пререлиз публикуется на
+     * каждое изменение основной ветки, и общий интервал давал бы предложение
+     * почти при каждом запуске.
+     */
+    val backgroundCheckIntervalMs: Long,
+) {
+    META("meta", 12 * 60 * 60 * 1000L),
+    ALPHA("alpha", 72 * 60 * 60 * 1000L);
+
+    /** Адрес релиза канала в API GitHub. */
+    fun releaseApiUrl(repo: String): String = when (this) {
+        // GitHub сам исключает пререлизы и черновики из /latest; форму тега и
+        // флаг пререлиза клиент проверяет вторым барьером в decideUpdate.
+        META -> "https://api.github.com/repos/$repo/releases/latest"
+        ALPHA -> "https://api.github.com/repos/$repo/releases/tags/$ALPHA_TAG"
+    }
 
     companion object {
         /** Плавающий пререлиз alpha-канала: тег постоянный, релиз пересоздаётся. */

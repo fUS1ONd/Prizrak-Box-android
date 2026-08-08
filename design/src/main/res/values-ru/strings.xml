@@ -432,8 +432,14 @@
     <string name="update_not_found_message">У вас установлена последняя версия.</string>
     <string name="update_error_title">Ошибка проверки обновлений</string>
     <string name="update_release_page">Страница релиза</string>
+    <string name="update_notification_title">Доступно обновление Prizrak-Box</string>
+    <string name="update_notification_text">Версия %s готова к загрузке</string>
+    <string name="update_notification_channel_name">Обновления приложения</string>
+    <string name="update_notification_channel_description">Уведомления об обновлениях Prizrak-Box</string>
+    <string name="update_download_description">Загрузка обновления…</string>
     <string name="update_error_network">Не удалось связаться с сервером обновлений.</string>
     <string name="update_error_malformed">Не удалось разобрать сведения о релизе.</string>
+    <string name="update_error_no_channel">Эта сборка не привязана к каналу обновлений.</string>
     <string name="update_error_wrong_channel">Релиз не относится к каналу обновлений этой сборки.</string>
     <string name="update_error_foreign_application">Сборка из релиза предназначена другому приложению.</string>
     <string name="update_error_no_asset">В релизе нет сборки для вашего устройства.</string>
