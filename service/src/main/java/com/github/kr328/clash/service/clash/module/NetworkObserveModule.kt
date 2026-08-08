@@ -38,15 +38,26 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
     @Volatile
     private var curDnsList = emptyList<String>()
 
+    // Сеть-победитель по приоритету транспорта (см. networkToInt). null — сетей нет.
+    // Отдельный флаг отличает «ещё не выбирали» от «выбрали, но сетей не было»:
+    // первое заполнение — не смена сети, появление сети после полного пропадания — смена.
+    @Volatile
+    private var bestNetwork: Network? = null
+
+    @Volatile
+    private var bestNetworkKnown = false
+
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             Log.i("NetworkObserve onAvailable network=$network")
             networkInfos[network] = NetworkInfo()
+            notifyNetworkChangeIfNeeded()
         }
 
         override fun onLosing(network: Network, maxMsToLive: Int) {
             Log.i("NetworkObserve onLosing network=$network")
             networkInfos[network]?.losingMs = System.currentTimeMillis() + maxMsToLive
+            notifyNetworkChangeIfNeeded()
             notifyDnsChange()
 
             networks.trySend(network)
@@ -55,6 +66,7 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
         override fun onLost(network: Network) {
             Log.i("NetworkObserve onLost network=$network")
             networkInfos.remove(network)
+            notifyNetworkChangeIfNeeded()
             notifyDnsChange()
 
             networks.trySend(network)
@@ -63,6 +75,7 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
         override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
             Log.i("NetworkObserve onLinkPropertiesChanged network=$network $linkProperties")
             networkInfos[network]?.dnsList = linkProperties.dnsServers
+            notifyNetworkChangeIfNeeded()
             notifyDnsChange()
 
             networks.trySend(network)
@@ -114,6 +127,29 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
             // TRANSPORT_LOWPAN / TRANSPORT_THREAD / TRANSPORT_WIFI_AWARE are not for general internet access, which will not set as default route.
             else -> 20
         } + (if (entry.value.isAvailable()) 0 else 10)
+    }
+
+    // Явный сигнал ядру «дефолтная сеть сменилась» (см. docs/adr/0001).
+    // Победитель пересчитывается на каждом событии; сигнал уходит только при его
+    // фактической смене, поэтому смена DNS без смены сети форс-чек не вызывает.
+    // При пропадании всех сетей сигнала нет (стрелять некуда), но null запоминается:
+    // появление сети после полного пропадания — тоже смена.
+    private fun notifyNetworkChangeIfNeeded() {
+        val newBest = networkInfos.entries.minByOrNull { networkToInt(it) }?.key
+        val prevBest = bestNetwork
+        if (!bestNetworkKnown) {
+            bestNetworkKnown = true
+            bestNetwork = newBest
+            return
+        }
+        if (newBest == prevBest) {
+            return
+        }
+        bestNetwork = newBest
+        if (newBest != null) {
+            Log.i("NetworkObserve best network changed $prevBest -> $newBest")
+            Clash.notifyNetworkChanged()
+        }
     }
 
     private fun notifyDnsChange() {

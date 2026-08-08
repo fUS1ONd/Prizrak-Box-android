@@ -36,6 +36,11 @@ func notifyDnsChanged(dnsList C.c_string) {
 	app.NotifyDnsChanged(d)
 }
 
+//export notifyNetworkChanged
+func notifyNetworkChanged() {
+	app.NotifyNetworkChanged()
+}
+
 //export notifyInstalledAppsChanged
 func notifyInstalledAppsChanged(uids C.c_string) {
 	u := C.GoString(uids)
