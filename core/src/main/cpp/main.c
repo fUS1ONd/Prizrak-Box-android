@@ -89,11 +89,11 @@ Java_com_github_kr328_clash_core_bridge_Bridge_nativeNotifyDnsChanged(JNIEnv *en
 }
 
 JNIEXPORT void JNICALL
-Java_com_github_kr328_clash_core_bridge_Bridge_nativeNotifyNetworkChanged(JNIEnv *env,
-                                                                          jobject thiz) {
+Java_com_github_kr328_clash_core_bridge_Bridge_nativeForceHealthCheckAll(JNIEnv *env,
+                                                                         jobject thiz) {
     TRACE_METHOD();
 
-    notifyNetworkChanged();
+    forceHealthCheckAll();
 }
 
 JNIEXPORT void JNICALL

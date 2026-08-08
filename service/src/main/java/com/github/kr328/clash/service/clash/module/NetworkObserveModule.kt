@@ -148,7 +148,7 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
         bestNetwork = newBest
         if (newBest != null) {
             Log.i("NetworkObserve best network changed $prevBest -> $newBest")
-            Clash.notifyNetworkChanged()
+            Clash.forceHealthCheckAll()
         }
     }
 

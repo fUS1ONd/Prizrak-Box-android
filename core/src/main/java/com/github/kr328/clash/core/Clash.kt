@@ -54,8 +54,8 @@ object Clash {
         Bridge.nativeNotifyDnsChanged(dns.toSet().joinToString(separator = ","))
     }
 
-    fun notifyNetworkChanged() {
-        Bridge.nativeNotifyNetworkChanged()
+    fun forceHealthCheckAll() {
+        Bridge.nativeForceHealthCheckAll()
     }
 
     fun notifyTimeZoneChanged(name: String, offset: Int) {

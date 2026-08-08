@@ -36,9 +36,9 @@ func notifyDnsChanged(dnsList C.c_string) {
 	app.NotifyDnsChanged(d)
 }
 
-//export notifyNetworkChanged
-func notifyNetworkChanged() {
-	app.NotifyNetworkChanged()
+//export forceHealthCheckAll
+func forceHealthCheckAll() {
+	app.ForceHealthCheckAll()
 }
 
 //export notifyInstalledAppsChanged
