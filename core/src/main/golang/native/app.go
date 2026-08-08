@@ -36,6 +36,11 @@ func notifyDnsChanged(dnsList C.c_string) {
 	app.NotifyDnsChanged(d)
 }
 
+//export forceHealthCheckAll
+func forceHealthCheckAll() {
+	app.ForceHealthCheckAll()
+}
+
 //export notifyInstalledAppsChanged
 func notifyInstalledAppsChanged(uids C.c_string) {
 	u := C.GoString(uids)
