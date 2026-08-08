@@ -35,6 +35,7 @@ import com.github.kr328.clash.design.compose.theme.ClashThemeVariant
 import com.github.kr328.clash.design.model.DarkMode
 import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.update.UpdateChecker
+import com.github.kr328.clash.update.showUpdateAvailableDialog
 import com.github.kr328.clash.util.importProfileFromUrl
 import com.github.kr328.clash.util.startClashService
 import com.github.kr328.clash.util.stopClashService
@@ -399,27 +400,26 @@ class MainActivity : BaseActivity() {
     private suspend fun runUpdateCheckSilent() {
         when (val result = UpdateChecker.check(this)) {
             is UpdateChecker.CheckResult.UpdateAvailable ->
-                UpdateChecker.showUpdateNotification(this, result.tagName, result.downloadUrl)
+                UpdateChecker.showUpdateNotification(this, result)
             else -> Unit
         }
     }
 
     private fun handleUpdateIntent(intent: Intent) {
         if (intent.action != UpdateChecker.ACTION_SHOW_UPDATE) return
-        val tag = intent.getStringExtra(UpdateChecker.EXTRA_TAG) ?: return
+        val version = intent.getStringExtra(UpdateChecker.EXTRA_VERSION) ?: return
         val url = intent.getStringExtra(UpdateChecker.EXTRA_URL) ?: return
-        showUpdateAvailableDialog(tag, url)
-    }
 
-    private fun showUpdateAvailableDialog(tagName: String, downloadUrl: String) {
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.update_available_title)
-            .setMessage(getString(R.string.update_available_message, tagName))
-            .setPositiveButton(R.string.update_download) { _, _ ->
-                UpdateChecker.startDownload(this, downloadUrl, tagName)
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        // Ченджлог и ссылка на страницу релиза приезжают из уведомления: решение
+        // уже принято проверкой, повторно в сеть за ними ходить незачем.
+        showUpdateAvailableDialog(
+            UpdateChecker.CheckResult.UpdateAvailable(
+                versionName = version,
+                downloadUrl = url,
+                changelog = intent.getStringExtra(UpdateChecker.EXTRA_CHANGELOG).orEmpty(),
+                releaseUrl = intent.getStringExtra(UpdateChecker.EXTRA_RELEASE_URL).orEmpty(),
+            )
+        )
     }
 
     override fun onNewIntent(intent: Intent) {

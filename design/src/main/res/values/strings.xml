@@ -467,6 +467,12 @@
     <string name="update_not_found_title">No Updates</string>
     <string name="update_not_found_message">You are using the latest version.</string>
     <string name="update_error_title">Update Check Failed</string>
+    <string name="update_release_page">Release page</string>
+    <string name="update_error_network">Could not reach the update server.</string>
+    <string name="update_error_malformed">Could not read the release information.</string>
+    <string name="update_error_wrong_channel">The release does not belong to this build\'s update channel.</string>
+    <string name="update_error_foreign_application">The release build is meant for a different application.</string>
+    <string name="update_error_no_asset">The release has no build for your device.</string>
 
     <string name="shortcut_toggle_short">Toggle Clash</string>
     <string name="shortcut_toggle_long">Toggle Clash service on/off</string>
