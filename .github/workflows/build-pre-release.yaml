@@ -20,7 +20,32 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-      
+        with:
+          # Полная история и теги: ченджлог считается от тега прошлого пререлиза.
+          fetch-depth: 0
+
+      # Ченджлог собирается ДО шага удаления тега — в этот момент тег прошлого
+      # пререлиза ещё существует и даёт границу «с прошлой сборки». Payload
+      # push-события для этого не годится: при ручном запуске его нет.
+      - name: Changelog since previous pre-release
+        run: |
+          PREV=$(git rev-parse -q --verify "refs/tags/Prerelease-alpha^{commit}" || true)
+          if [ -n "$PREV" ]; then
+            LOG=$(git log --no-merges --pretty='- %s (%h)' "$PREV..HEAD")
+          else
+            # Первый прогон: тега ещё нет, границы тоже — берём последние коммиты.
+            LOG=$(git log --no-merges -n 20 --pretty='- %s (%h)')
+          fi
+          if [ -z "$LOG" ]; then
+            LOG="- изменений с прошлой сборки нет: пересобран тот же коммит"
+          fi
+          {
+            echo "### Изменения с прошлой сборки"
+            echo
+            echo "$LOG"
+          } > release-notes.md
+          cat release-notes.md
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -80,6 +105,16 @@ jobs:
           echo key.alias="$SIGNING_KEY_ALIAS" >> signing.properties
           echo key.password="$SIGNING_KEY_PASSWORD" >> signing.properties
 
+      # Код версии alpha-сборок: 100000 + номер прогона. Смещение обязательно —
+      # голый номер прогона меньше прежней константы 101, и система сочла бы
+      # установку откатом назад. Значение едет в сборку через local.properties:
+      # переписывать build.gradle.kts здесь нельзя, workflow триггерится на push
+      # в main и коммит из него зациклил бы сборки.
+      - name: Alpha version code
+        run: |
+          echo "alpha.version.code=$((100000 + GITHUB_RUN_NUMBER))" >> local.properties
+          cat local.properties
+
       - name: Pre-release Build
         if: success()
         run: ./gradlew --no-daemon app:assembleAlphaRelease
@@ -107,4 +142,7 @@ jobs:
           tag_name: Prerelease-alpha
           files: app/build/outputs/apk/alpha/release/*
           prerelease: true
-          generate_release_notes: true
+          # Тело релиза — свой ченджлог с прошлого пререлиза. Автогенерация не
+          # годится: предыдущего тега для сравнения нет, и GitHub складывает в
+          # тело список всех PR с основания репозитория.
+          body_path: release-notes.md
