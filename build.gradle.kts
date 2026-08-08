@@ -127,6 +127,17 @@ subprojects {
                 if (isApp && !removeSuffix) {
                     applicationIdSuffix = ".alpha"
                 }
+
+                // Код версии alpha-сборок приезжает из workflow пререлиза
+                // (100000 + номер прогона) через local.properties: тег и имя
+                // версии у alpha постоянны, и сравнивать внутри канала больше
+                // нечего. Вне CI свойства нет — остаётся код версии из
+                // defaultConfig.
+                if (isApp) {
+                    (queryConfigProperty("alpha.version.code") as? String)
+                        ?.trim()?.toIntOrNull()
+                        ?.let { versionCode = it }
+                }
             }
 
             create("meta") {
