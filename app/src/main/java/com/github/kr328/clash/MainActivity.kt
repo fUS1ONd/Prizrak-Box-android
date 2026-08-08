@@ -406,20 +406,7 @@ class MainActivity : BaseActivity() {
     }
 
     private fun handleUpdateIntent(intent: Intent) {
-        if (intent.action != UpdateChecker.ACTION_SHOW_UPDATE) return
-        val version = intent.getStringExtra(UpdateChecker.EXTRA_VERSION) ?: return
-        val url = intent.getStringExtra(UpdateChecker.EXTRA_URL) ?: return
-
-        // Ченджлог и ссылка на страницу релиза приезжают из уведомления: решение
-        // уже принято проверкой, повторно в сеть за ними ходить незачем.
-        showUpdateAvailableDialog(
-            UpdateChecker.CheckResult.UpdateAvailable(
-                versionName = version,
-                downloadUrl = url,
-                changelog = intent.getStringExtra(UpdateChecker.EXTRA_CHANGELOG).orEmpty(),
-                releaseUrl = intent.getStringExtra(UpdateChecker.EXTRA_RELEASE_URL).orEmpty(),
-            )
-        )
+        UpdateChecker.readUpdateFromIntent(intent)?.let(::showUpdateAvailableDialog)
     }
 
     override fun onNewIntent(intent: Intent) {

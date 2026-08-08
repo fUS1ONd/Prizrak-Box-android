@@ -39,6 +39,7 @@ object UpdateChecker {
 
     const val ACTION_SHOW_UPDATE = "com.github.kr328.clash.action.SHOW_UPDATE"
     const val EXTRA_VERSION = "update_version"
+    const val EXTRA_VERSION_CODE = "update_version_code"
     const val EXTRA_URL = "update_url"
     const val EXTRA_CHANGELOG = "update_changelog"
     const val EXTRA_RELEASE_URL = "update_release_url"
@@ -47,25 +48,25 @@ object UpdateChecker {
     private val updateChannel: UpdateChannel?
         get() = UpdateChannel.of(BuildConfig.UPDATE_CHANNEL)
 
-    /**
-     * Интервал фоновой проверки. У alpha он длиннее: пререлиз публикуется на
-     * каждое изменение основной ветки, и общий интервал давал бы предложение
-     * почти при каждом запуске.
-     */
+    /** Сборка без известного канала не проверяет обновления вовсе. */
     private val checkIntervalMs: Long
-        get() = when (updateChannel) {
-            UpdateChannel.META -> 12 * 60 * 60 * 1000L
-            UpdateChannel.ALPHA -> 72 * 60 * 60 * 1000L
-            null -> Long.MAX_VALUE
-        }
+        get() = updateChannel?.backgroundCheckIntervalMs ?: Long.MAX_VALUE
 
     sealed class CheckResult {
         data class UpdateAvailable(
             val versionName: String,
+            val versionCode: Long,
             val downloadUrl: String,
             val changelog: String,
             val releaseUrl: String,
-        ) : CheckResult()
+        ) : CheckResult() {
+            /**
+             * Как версия показывается пользователю. Код версии в скобках
+             * обязателен: у alpha-сборок имя версии постоянно, и без кода
+             * соседние сборки в предложении неотличимы.
+             */
+            fun displayVersion(): String = "$versionName ($versionCode)"
+        }
 
         object UpToDate : CheckResult()
         data class Error(val message: String) : CheckResult()
@@ -80,11 +81,11 @@ object UpdateChecker {
     suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
         val channel = updateChannel
             ?: return@withContext CheckResult.Error(
-                context.getString(DesignR.string.update_error_wrong_channel)
+                context.getString(DesignR.string.update_error_no_channel)
             )
 
         try {
-            val releaseJson = httpGet(releaseUrl(channel))
+            val releaseJson = httpGet(channel.releaseApiUrl(REPO))
 
             // Метаданные сборки лежат отдельным ассетом рядом с APK — это второй
             // и последний сетевой запрос проверки.
@@ -113,6 +114,7 @@ object UpdateChecker {
             ) {
                 is UpdateDecision.Available -> CheckResult.UpdateAvailable(
                     versionName = decision.versionName,
+                    versionCode = decision.versionCode,
                     downloadUrl = decision.downloadUrl,
                     changelog = decision.changelog,
                     releaseUrl = decision.releaseUrl,
@@ -122,19 +124,12 @@ object UpdateChecker {
                     context.getString(decision.reason.messageRes())
                 )
             }
-        } catch (e: Exception) {
-            CheckResult.Error(
-                e.message ?: context.getString(DesignR.string.update_error_network)
-            )
+        } catch (_: Exception) {
+            // Сеть отвалилась или источник обновлений недоступен: техническую
+            // причину пользователю показывать нечего, остальные сообщения
+            // проверки тоже локализованы.
+            CheckResult.Error(context.getString(DesignR.string.update_error_network))
         }
-    }
-
-    private fun releaseUrl(channel: UpdateChannel): String = when (channel) {
-        // GitHub сам исключает пререлизы и черновики из /latest; форму тега и
-        // флаг пререлиза клиент проверяет вторым барьером в decideUpdate.
-        UpdateChannel.META -> "https://api.github.com/repos/$REPO/releases/latest"
-        UpdateChannel.ALPHA ->
-            "https://api.github.com/repos/$REPO/releases/tags/${UpdateChannel.ALPHA_TAG}"
     }
 
     private fun httpGet(url: String): String {
@@ -172,7 +167,7 @@ object UpdateChecker {
         UpdateDecision.Reason.NO_SUITABLE_ASSET -> DesignR.string.update_error_no_asset
     }
 
-    fun startDownload(context: Context, downloadUrl: String, versionName: String) {
+    fun startDownload(context: Context, update: CheckResult.UpdateAvailable) {
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         // Remove previous download if any
@@ -182,9 +177,9 @@ object UpdateChecker {
             runCatching { dm.remove(prevId) }
         }
 
-        val request = DownloadManager.Request(Uri.parse(downloadUrl))
-            .setTitle("Prizrak-Box $versionName")
-            .setDescription("Загрузка обновления...")
+        val request = DownloadManager.Request(Uri.parse(update.downloadUrl))
+            .setTitle(context.getString(DesignR.string.update_notification_title))
+            .setDescription(context.getString(DesignR.string.update_download_description))
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(
                 context, Environment.DIRECTORY_DOWNLOADS, APK_FILE_NAME
@@ -219,10 +214,29 @@ object UpdateChecker {
         context.startActivity(intent)
     }
 
+    /**
+     * Предложение из уведомления: решение уже принято проверкой, повторно в
+     * сеть за ним ходить незачем. null — интент не про обновление.
+     */
+    fun readUpdateFromIntent(intent: Intent): CheckResult.UpdateAvailable? {
+        if (intent.action != ACTION_SHOW_UPDATE) return null
+        val versionName = intent.getStringExtra(EXTRA_VERSION) ?: return null
+        val downloadUrl = intent.getStringExtra(EXTRA_URL) ?: return null
+
+        return CheckResult.UpdateAvailable(
+            versionName = versionName,
+            versionCode = intent.getLongExtra(EXTRA_VERSION_CODE, 0L),
+            downloadUrl = downloadUrl,
+            changelog = intent.getStringExtra(EXTRA_CHANGELOG).orEmpty(),
+            releaseUrl = intent.getStringExtra(EXTRA_RELEASE_URL).orEmpty(),
+        )
+    }
+
     fun showUpdateNotification(context: Context, update: CheckResult.UpdateAvailable) {
         val intent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_SHOW_UPDATE
             putExtra(EXTRA_VERSION, update.versionName)
+            putExtra(EXTRA_VERSION_CODE, update.versionCode)
             putExtra(EXTRA_URL, update.downloadUrl)
             putExtra(EXTRA_CHANGELOG, update.changelog)
             putExtra(EXTRA_RELEASE_URL, update.releaseUrl)
@@ -235,8 +249,10 @@ object UpdateChecker {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("Доступно обновление Prizrak-Box")
-            .setContentText("Версия ${update.versionName} готова к загрузке")
+            .setContentTitle(context.getString(DesignR.string.update_notification_title))
+            .setContentText(
+                context.getString(DesignR.string.update_notification_text, update.displayVersion())
+            )
             .setContentIntent(pi)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -250,10 +266,11 @@ object UpdateChecker {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Обновления приложения",
+                context.getString(DesignR.string.update_notification_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Уведомления об обновлениях Prizrak-Box"
+                description =
+                    context.getString(DesignR.string.update_notification_channel_description)
             }
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.createNotificationChannel(channel)
