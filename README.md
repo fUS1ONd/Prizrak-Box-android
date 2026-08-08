@@ -81,7 +81,13 @@ APP package name is `com.github.metacubex.clash.meta`
 - When `MetaCubeX/Clash.Meta` kernel is updated to a new version, the `Update Dependencies` actions in this repo will be triggered automatically.
   - It will pull the new version of the meta kernel, update all the golang dependencies, and create a PR without manual intervention.
   - If there is any compile error in PR, you need to fix it before merging. Alternatively, you may merge the PR directly.
-- Manually triggering `Build Pre-Release` actions will compile and publish a `PreRelease` version.
+- `Build Pre-Release` actions run on every push to `main` (and can be triggered manually); they compile and publish a `PreRelease` version under the floating `Prerelease-alpha` tag.
+  - `versionName` stays as it is, but `versionCode` of alpha builds is computed in CI as `100000 + GITHUB_RUN_NUMBER` and passed to the build through `local.properties` (`alpha.version.code`), so alpha builds install over each other.
+  - The release body is a changelog built from the commits since the previous pre-release; the in-app updater shows it to the user.
 - Manually triggering `Build Release` actions will compile, tag and publish a `Release` version.
   - You must fill the blank `Release Tag` with the tag you want to release in the format of `v1.2.3`.
   - `versionName` and `versionCode` in `build.gradle.kts` will be automatically bumped to the tag you filled above.
+
+#### In-app updates
+
+The app checks for updates in this repository (`fUS1ONd/Prizrak-Box-android`). The channel is pinned by the product flavor via `BuildConfig.UPDATE_CHANNEL`: `meta` follows `/releases/latest`, `alpha` follows the `Prerelease-alpha` tag. Both channels decide "is it newer" and "which file to download" from the `output-metadata.json` published next to the APKs, so that file must stay in the release assets.
