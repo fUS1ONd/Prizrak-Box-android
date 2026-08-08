@@ -7,6 +7,11 @@ on:
         description: 'Release Tag (v1.x.x or higher)'
         required: true
 
+# Публикация pre-release и релизов требует записи в contents: права по
+# умолчанию в репозитории — read, поэтому объявляем их явно здесь, как в ядре.
+permissions:
+  contents: write
+
 jobs:
   BuildRelease:
     runs-on: ubuntu-latest
