@@ -94,8 +94,7 @@ func startTun(fd C.int, stack, gateway, portal, dns C.c_string, callback unsafe.
 
 	rTun = remote
 
-	// Туннель поднят: рвём pre-VPN соединения и форсим проверку нод
-	// (обоснование — в app.NotifyTunnelUp).
+	// Туннель поднят: форсим проверку нод (обоснование — в app.NotifyTunnelUp).
 	app.NotifyTunnelUp()
 
 	return 0

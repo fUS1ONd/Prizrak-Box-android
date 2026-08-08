@@ -38,7 +38,7 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
     @Volatile
     private var curDnsList = emptyList<String>()
 
-    // Сеть-победитель по приоритету транспорта (см. networkToInt). null — сетей нет.
+    // Сеть-победитель по приоритету транспорта (см. transportToInt). null — сетей нет.
     // Отдельный флаг отличает «ещё не выбирали» от «выбрали, но сетей не было»:
     // первое заполнение — не смена сети, появление сети после полного пропадания — смена.
     @Volatile
@@ -57,7 +57,6 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
         override fun onLosing(network: Network, maxMsToLive: Int) {
             Log.i("NetworkObserve onLosing network=$network")
             networkInfos[network]?.losingMs = System.currentTimeMillis() + maxMsToLive
-            notifyNetworkChangeIfNeeded()
             notifyDnsChange()
 
             networks.trySend(network)
@@ -70,6 +69,14 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
             notifyDnsChange()
 
             networks.trySend(network)
+        }
+
+        override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+            // На onAvailable capabilities сети ещё не известны и
+            // getNetworkCapabilities возвращает null — только что появившийся WiFi
+            // получает худший ранг и победителем не становится. Реальный ранг
+            // известен здесь, поэтому победителя пересчитываем и на этом событии.
+            notifyNetworkChangeIfNeeded()
         }
 
         override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
@@ -111,7 +118,11 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
     }
 
     private fun networkToInt(entry: Map.Entry<Network, NetworkInfo>): Int {
-        val capabilities = connectivity.getNetworkCapabilities(entry.key)
+        return transportToInt(entry.key) + (if (entry.value.isAvailable()) 0 else 10)
+    }
+
+    private fun transportToInt(network: Network): Int {
+        val capabilities = connectivity.getNetworkCapabilities(network)
         // calculate priority based on transport type, available state
         // lower value means higher priority
         // wifi > ethernet > usb tethering > bluetooth tethering > cellular > satellite > other
@@ -126,7 +137,7 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_SATELLITE) -> 5
             // TRANSPORT_LOWPAN / TRANSPORT_THREAD / TRANSPORT_WIFI_AWARE are not for general internet access, which will not set as default route.
             else -> 20
-        } + (if (entry.value.isAvailable()) 0 else 10)
+        }
     }
 
     // Явный сигнал ядру «дефолтная сеть сменилась» (см. docs/adr/0001).
@@ -135,7 +146,7 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
     // При пропадании всех сетей сигнала нет (стрелять некуда), но null запоминается:
     // появление сети после полного пропадания — тоже смена.
     private fun notifyNetworkChangeIfNeeded() {
-        val newBest = networkInfos.entries.minByOrNull { networkToInt(it) }?.key
+        val newBest = selectBestNetwork()
         val prevBest = bestNetwork
         if (!bestNetworkKnown) {
             bestNetworkKnown = true
@@ -150,6 +161,25 @@ class NetworkObserveModule(service: Service) : Module<Network>(service) {
             Log.i("NetworkObserve best network changed $prevBest -> $newBest")
             Clash.forceHealthCheckAll()
         }
+    }
+
+    // Победитель считается по транспорту и только по нему. Слагаемое
+    // isAvailable() из networkToInt здесь не годится: losingMs задаётся один раз
+    // в onLosing и потом никем не снимается, поэтому по истечении maxMsToLive
+    // сеть молча возвращает себе балл — и следующее же произвольное событие
+    // выдало бы «сеть сменилась» без всякой смены сети.
+    private fun selectBestNetwork(): Network? {
+        val best = networkInfos.keys.minByOrNull { transportToInt(it) } ?: return null
+        val prev = bestNetwork
+
+        // Ничья по транспорту (две WiFi-сети) не должна давать сигнал: порядок
+        // обхода ConcurrentHashMap не определён, и победитель прыгал бы сам по
+        // себе. Пока прежний в строю и не хуже нового — держимся за него.
+        if (prev != null && networkInfos.containsKey(prev) && transportToInt(prev) <= transportToInt(best)) {
+            return prev
+        }
+
+        return best
     }
 
     private fun notifyDnsChange() {
