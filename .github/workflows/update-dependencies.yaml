@@ -3,9 +3,13 @@ on:
   workflow_dispatch:
     inputs:
       moshen_version:
-        description: 'legiz-ru/moshen version tag (e.g. v1.1.17-moshen-splithttp). Leave empty to auto-detect latest release.'
+        description: 'Тег ядра fUS1ONd/moshen (например v1.19.29-fs.1). Пусто — возьмётся последний релиз.'
         required: false
         default: ''
+
+env:
+  # Репозиторий ядра — задаётся в одном месте, дальше подставляется везде.
+  CORE_REPO: fUS1ONd/moshen
 
 jobs:
   update-dependencies:
@@ -36,31 +40,38 @@ jobs:
           if [ -n "$INPUT" ]; then
             echo "version=$INPUT" >> "$GITHUB_OUTPUT"
           else
-            LATEST=$(curl -sf "https://api.github.com/repos/legiz-ru/moshen/releases/latest" \
+            LATEST=$(curl -sf "https://api.github.com/repos/${{ env.CORE_REPO }}/releases/latest" \
               -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               | jq -r '.tag_name')
+            if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+              echo "У ${{ env.CORE_REPO }} нет ни одного релиза — укажи тег вручную." >&2
+              exit 1
+            fi
             echo "version=$LATEST" >> "$GITHUB_OUTPUT"
           fi
 
+      # Шаблон замены намеренно не привязан к текущему владельцу модуля: в go.mod
+      # может стоять и апстримный legiz-ru/moshen (сразу после синка с апстримом),
+      # и наш форк. Матчим строку replace целиком по левой части.
       - name: Pin new moshen version in go.mod files
         run: |
           NEW_VERSION="${{ steps.resolve.outputs.version }}"
-          sed -i "s|replace github.com/metacubex/mihomo => github.com/legiz-ru/moshen .*|replace github.com/metacubex/mihomo => github.com/legiz-ru/moshen $NEW_VERSION|g" \
+          sed -i -E "s|^replace github.com/metacubex/mihomo => .*|replace github.com/metacubex/mihomo => github.com/${{ env.CORE_REPO }} $NEW_VERSION|" \
             core/src/foss/golang/go.mod \
             core/src/main/golang/go.mod
-          echo "Pinned moshen to $NEW_VERSION"
+          echo "Ядро запинено на $NEW_VERSION"
           grep "replace github.com/metacubex/mihomo" core/src/foss/golang/go.mod
           grep "replace github.com/metacubex/mihomo" core/src/main/golang/go.mod
 
       - name: Update Foss Gomod
         run: |
           cd ${{ github.workspace }}/core/src/foss/golang/
-          GONOSUMDB=github.com/legiz-ru/moshen go mod tidy
+          go mod tidy
 
       - name: Update Main Gomod
         run: |
           cd ${{ github.workspace }}/core/src/main/golang/
-          GONOSUMDB=github.com/legiz-ru/moshen go mod tidy
+          go mod tidy
 
       - name: Create Pull Request
         id: cpr
@@ -73,8 +84,8 @@ jobs:
           title: "Update moshen to ${{ steps.resolve.outputs.version }}"
           draft: false
           body: |
-            - Update Moshen Core (legiz-ru/moshen) → `${{ steps.resolve.outputs.version }}`
-            - Update Go Module Dependencies
+            - Ядро (`${{ env.CORE_REPO }}`) → `${{ steps.resolve.outputs.version }}`
+            - Обновлены зависимости Go-модулей (`go mod tidy`)
           labels: |
             Update
 

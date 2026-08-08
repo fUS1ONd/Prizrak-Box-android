@@ -36,22 +36,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      # См. комментарий в build-release.yaml: версия ядра берётся из go.mod,
+      # путь до кэша — у `go list`, вручную его не собрать из-за экранирования
+      # заглавных букв в пути модуля.
       - name: Update CA and prepare moshen module
         run: |
           sudo apt-get update && sudo apt-get install -y ca-certificates
           sudo update-ca-certificates
           cd ${{ github.workspace }}/core/src/foss/golang
-          GONOSUMDB=github.com/snakem982/mihomo go mod download github.com/snakem982/mihomo@v1.1.17-moshen
-          MOSHEN_DIR="$(go env GOMODCACHE)/github.com/snakem982/mihomo@v1.1.17-moshen"
+          go mod download
+          MOSHEN_DIR="$(go list -m -f '{{.Dir}}' github.com/metacubex/mihomo)"
+          echo "Ядро: $(go list -m github.com/metacubex/mihomo)"
           chmod -R u+w "$MOSHEN_DIR"
           cp -f /etc/ssl/certs/ca-certificates.crt "$MOSHEN_DIR/component/ca/ca-certificates.crt"
 
       - name: Tidy Go modules
         run: |
           cd ${{ github.workspace }}/core/src/foss/golang
-          GONOSUMDB=github.com/snakem982/mihomo go mod tidy
+          go mod tidy
           cd ${{ github.workspace }}/core/src/main/golang
-          GONOSUMDB=github.com/snakem982/mihomo go mod tidy
+          go mod tidy
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > release.keystore
@@ -66,9 +70,6 @@ jobs:
           echo keystore.password="$SIGNING_STORE_PASSWORD" > signing.properties
           echo key.alias="$SIGNING_KEY_ALIAS" >> signing.properties
           echo key.password="$SIGNING_KEY_PASSWORD" >> signing.properties
-            
-          echo "cat signing.properties"
-          cat signing.properties
 
       - name: Pre-release Build
         if: success()
