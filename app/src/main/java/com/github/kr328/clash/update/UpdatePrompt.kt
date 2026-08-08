@@ -1,6 +1,7 @@
 package com.github.kr328.clash.update
 
 import android.app.Activity
+import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -26,19 +27,27 @@ fun Activity.showUpdateAvailableDialog(update: UpdateChecker.CheckResult.UpdateA
         .setTitle(DesignR.string.update_available_title)
         .setMessage(updateMessage(update))
         .setPositiveButton(DesignR.string.update_download) { _, _ ->
-            UpdateChecker.startDownload(this, update.downloadUrl, update.versionName)
+            UpdateChecker.startDownload(this, update)
         }
         .setNegativeButton(DesignR.string.cancel, null)
 
     if (update.releaseUrl.isNotEmpty()) {
-        builder.setNeutralButton(DesignR.string.update_release_page) { _, _ ->
+        builder.setNeutralButton(DesignR.string.update_release_page, null)
+    }
+
+    val dialog = builder.create()
+
+    // Страница релиза открывается, не закрывая предложение: пользователь идёт
+    // читать ченджлог целиком и возвращается к кнопке «Скачать».
+    dialog.setOnShowListener {
+        dialog.getButton(DialogInterface.BUTTON_NEUTRAL)?.setOnClickListener {
             runCatching {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.releaseUrl)))
             }
         }
     }
 
-    builder.show()
+    dialog.show()
 }
 
 /**
@@ -46,7 +55,7 @@ fun Activity.showUpdateAvailableDialog(update: UpdateChecker.CheckResult.UpdateA
  * рендерится — тянуть зависимость ради трёх решёток не стоит.
  */
 private fun Activity.updateMessage(update: UpdateChecker.CheckResult.UpdateAvailable): String {
-    val header = getString(DesignR.string.update_available_message, update.versionName)
+    val header = getString(DesignR.string.update_available_message, update.displayVersion())
     val changelog = update.changelog.trim()
 
     // Пустое описание не должно ломать предложение — обновиться по-прежнему можно.

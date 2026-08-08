@@ -468,8 +468,14 @@
     <string name="update_not_found_message">You are using the latest version.</string>
     <string name="update_error_title">Update Check Failed</string>
     <string name="update_release_page">Release page</string>
+    <string name="update_notification_title">Prizrak-Box update available</string>
+    <string name="update_notification_text">Version %s is ready to download</string>
+    <string name="update_notification_channel_name">App updates</string>
+    <string name="update_notification_channel_description">Notifications about Prizrak-Box updates</string>
+    <string name="update_download_description">Downloading the update…</string>
     <string name="update_error_network">Could not reach the update server.</string>
     <string name="update_error_malformed">Could not read the release information.</string>
+    <string name="update_error_no_channel">This build is not tied to an update channel.</string>
     <string name="update_error_wrong_channel">The release does not belong to this build\'s update channel.</string>
     <string name="update_error_foreign_application">The release build is meant for a different application.</string>
     <string name="update_error_no_asset">The release has no build for your device.</string>
