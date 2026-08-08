@@ -27,6 +27,12 @@ class SuspendModule(service: Service) : Module<Unit>(service) {
                     Intent.ACTION_SCREEN_ON -> {
                         Clash.suspendCore(false)
 
+                        // Пока экран был выключен, ядро было усыплено и данные о живости
+                        // нод протухли: без форс-чека первое открытое приложение ждало бы
+                        // штатного тика health-check. Стреляем на каждое включение экрана,
+                        // без порогов: мигание экраном схлопывает дебаунс ядра (~1 с).
+                        Clash.forceHealthCheckAll()
+
                         Log.d("Clash resumed")
                     }
                     Intent.ACTION_SCREEN_OFF -> {
